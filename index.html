@@ -5,224 +5,251 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Codex</title>
 <meta name="description" content="Programme de lecture d'Axel : rotations, bibliothèque et carnet.">
-<meta name="theme-color" content="#EEF0EC" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0E1320" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#1A1411">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Codex">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="preload" href="fonts/newsreader-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/hanken-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <style>
-/* Layout : une colonne mobile d'abord, trois vues (Lecture, Bibliothèque, Carnet), barre d'onglets en bas, fiches en feuilles glissantes. */
+/* Direction : une bibliothèque le soir. Fond en noyer, livres reliés en toile (indigo, vert-de-gris, garance), titres à la feuille d'or.
+   Pièce maîtresse : les 13 rotations rendues comme une vraie étagère de dos de livres. Tout le reste reste calme. */
+@font-face{font-family:"Newsreader";src:url(fonts/newsreader-latin-opsz-normal.woff2) format("woff2");font-weight:200 800;font-style:normal;font-display:swap}
+@font-face{font-family:"Newsreader";src:url(fonts/newsreader-latin-opsz-italic.woff2) format("woff2");font-weight:200 800;font-style:italic;font-display:swap}
+@font-face{font-family:"Hanken Grotesk";src:url(fonts/hanken-grotesk-latin-wght-normal.woff2) format("woff2");font-weight:100 900;font-style:normal;font-display:swap}
 :root{
-  --bg:#EEF0EC; --surface:#FFFFFF; --surface-2:#F6F7F4; --ink:#161C27; --muted:#5D6573; --line:#D9DDD5;
-  --lapis:#2442A8; --gold:#9A7019; --gold-soft:#F5ECD6;
-  --pilier:#2442A8; --sage:#22735F; --plaisir:#B4432F;
-  --pilier-soft:#E3E8F8; --sage-soft:#DDEFE8; --plaisir-soft:#F8E4DF;
-  --ok:#22735F; --warn:#9A7019; --on-spine:#FFFFFF;
-  --shadow:0 1px 2px rgba(22,28,39,.06),0 8px 24px rgba(22,28,39,.07);
-  --f-display:"Cinzel","Trajan Pro",Georgia,serif;
-  --f-body:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
-  color-scheme:light;
+  --wood:#1A1411; --wood-2:#231B16; --wood-3:#2D231C; --plank:#4A3424; --plank-hi:#6B4B33; --edge:#3A2C22;
+  --paper:#EEE4CE; --paper-2:#C9BCA2; --dim:#968A75; --ink:#2A2019;
+  --foil:#D6B05C; --foil-dim:#8F7640;
+  --pilier:#2F4C8F; --sage:#3E6C58; --plaisir:#9C3A2B; --ribbon:#C23B2E;
+  --serif:"Newsreader","Iowan Old Style","Palatino Linotype",Georgia,serif;
+  --sans:"Hanken Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
 }
-@media (prefers-color-scheme:dark){:root{
-  --bg:#0E1320; --surface:#161D2C; --surface-2:#1B2335; --ink:#ECE9E1; --muted:#9AA2B1; --line:#283247;
-  --lapis:#8DA6FF; --gold:#DDB257; --gold-soft:#33291A;
-  --pilier:#8DA6FF; --sage:#5FC7A9; --plaisir:#EE8A76;
-  --pilier-soft:#1F2A4A; --sage-soft:#173229; --plaisir-soft:#3A221D;
-  --ok:#5FC7A9; --warn:#DDB257; --on-spine:#0E1320;
-  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35); color-scheme:dark}}
-
 *{box-sizing:border-box}
-html{background:var(--bg);-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
-  padding-block:env(safe-area-inset-top,0px) calc(92px + env(safe-area-inset-bottom,0px))}
-button,input,textarea,select{font:inherit;color:inherit}
-button{cursor:pointer}
+html{background:var(--wood);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--wood);color:var(--paper);font:16px/1.5 var(--sans);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;
+  padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));
+  padding-block:env(safe-area-inset-top,0px) calc(104px + env(safe-area-inset-bottom,0px))}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0;text-align:inherit}
 img{max-width:100%}
 [hidden]{display:none!important}
-:focus-visible{outline:2px solid var(--lapis);outline-offset:2px;border-radius:6px}
-.wrap{max-width:720px;margin:0 auto}
+:focus-visible{outline:2px solid var(--foil);outline-offset:3px;border-radius:4px}
+.wrap{max-width:760px;margin:0 auto}
 
-.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding-block:18px 4px}
-.brand{font-family:var(--f-display);font-weight:700;font-size:28px;letter-spacing:.06em;line-height:1}
-.brand small{display:block;font-family:var(--f-body);font-weight:700;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
-.iconbtn{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center}
-.iconbtn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.view-title{font-family:var(--f-display);font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin:26px 0 12px;display:flex;align-items:center;gap:10px;font-weight:600}
-.view-title::after{content:"";flex:1;height:1px;background:var(--line)}
+/* En-tête */
+.top{display:flex;align-items:center;justify-content:space-between;padding-block:22px 0}
+.mark{font-family:var(--serif);font-style:italic;font-weight:500;font-size:34px;letter-spacing:-.01em;line-height:1;color:var(--paper)}
+.mark i{font-style:normal;color:var(--foil)}
+.round{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:var(--paper-2);border:1px solid var(--edge)}
+.round svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.summary{font-family:var(--serif);font-size:19px;line-height:1.45;color:var(--paper-2);margin:14px 0 0;max-width:30em;text-wrap:pretty}
+.summary b{font-weight:500;color:var(--paper)}
+.summary .g{color:var(--foil)}
+.nudge{margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px;color:var(--paper-2);border-top:1px solid var(--edge);border-bottom:1px solid var(--edge);padding:10px 0}
+.nudge button{color:var(--foil);font-weight:600;white-space:nowrap}
 
-.ledger{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:16px}
-.ledger div{background:var(--surface);padding:12px 14px}
-.ledger b{display:block;font-family:var(--f-mono);font-weight:500;font-size:22px;font-variant-numeric:tabular-nums;line-height:1.2}
-.ledger span{font-size:12px;color:var(--muted)}
-.ledger em{font-style:normal;color:var(--muted);font-size:14px}
+.h{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.005em;margin:38px 0 14px;color:var(--paper);display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.h small{font-family:var(--sans);font-size:13px;font-weight:500;color:var(--dim)}
 
-.banner{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;background:var(--gold-soft);color:var(--ink);border-radius:12px;padding:10px 14px;font-size:13px}
-.banner button{border:0;background:var(--ink);color:var(--bg);border-radius:10px;padding:7px 12px;font-weight:700;font-size:13px;white-space:nowrap}
+/* Couverture en toile (ou vraie couverture) */
+.cloth{position:relative;flex:none;overflow:hidden;border-radius:2px 5px 5px 2px;background-color:var(--c);
+  background-image:repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,transparent 1px 3px),repeating-linear-gradient(90deg,rgba(0,0,0,.07) 0 1px,transparent 1px 3px);
+  box-shadow:inset 7px 0 0 rgba(0,0,0,.22),inset 8px 0 0 rgba(255,255,255,.06),0 10px 24px -8px rgba(0,0,0,.7),0 2px 4px rgba(0,0,0,.4);
+  display:flex;flex-direction:column;justify-content:space-between;align-items:center;text-align:center;padding:20% 15% 14% 21%;color:var(--paper)}
+.cloth[data-t="pilier"]{--c:var(--pilier)} .cloth[data-t="sage"]{--c:var(--sage)} .cloth[data-t="plaisir"]{--c:var(--plaisir)}
+.cloth::before{content:"";position:absolute;inset:7% 7% 7% 13%;border:1px solid rgba(238,228,206,.22);border-radius:1px;pointer-events:none}
+.cloth.god::before{border-color:rgba(214,176,92,.75)}
+.cloth.god::after{content:"";position:absolute;inset:9.5% 9.5% 9.5% 15.5%;border:1px solid rgba(214,176,92,.32);pointer-events:none}
+.cloth .ct{position:relative;max-width:100%;font-family:var(--serif);font-weight:600;line-height:1.1;text-wrap:balance;hyphens:auto;-webkit-hyphens:auto;overflow-wrap:break-word;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:5}
+.cloth.god .ct{color:var(--foil)}
+.cloth .ca{position:relative;max-width:100%;font-family:var(--serif);font-style:italic;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cloth .img{position:absolute;inset:0;z-index:2}
+.cloth .img img{width:100%;height:100%;object-fit:cover;display:block}
+.cloth.xl{width:150px;height:225px;font-size:19px} .cloth.xl .ca{font-size:14px}
+.cloth.lg{width:128px;height:192px;font-size:16px} .cloth.lg .ca{font-size:12px}
+.cloth.md{width:100%;aspect-ratio:2/3;font-size:clamp(11px,3.1vw,15px)} .cloth.md .ca{font-size:.72em}
+.cloth.sm{width:40px;height:60px;padding:0} .cloth.sm .ct,.cloth.sm .ca{display:none} .cloth.sm::before{inset:9% 9% 9% 18%}
 
-/* Couverture ou dos */
-.cov{position:relative;flex:none;border-radius:4px 7px 7px 4px;overflow:hidden;background:var(--surface-2);box-shadow:inset 4px 0 0 rgba(0,0,0,.18)}
-.cov img{width:100%;height:100%;object-fit:cover;display:block}
-.cov.lg{width:72px;height:108px} .cov.md{width:52px;height:76px} .cov.sm{width:32px;height:48px}
-.spine{width:100%;height:100%;display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px;font-family:var(--f-display);font-weight:700;font-size:13px;color:var(--on-spine)}
-.cov.sm .spine{font-size:10px;padding-bottom:4px}
-.spine[data-t="pilier"]{background:var(--pilier)} .spine[data-t="sage"]{background:var(--sage)} .spine[data-t="plaisir"]{background:var(--plaisir)}
-.cov.god .spine::before{content:"";position:absolute;top:9px;left:9px;right:9px;height:2px;background:var(--gold);box-shadow:0 5px 0 var(--gold)}
-.cov.sm.god .spine::before{top:6px;left:6px;right:6px;height:1.5px;box-shadow:0 3px 0 var(--gold)}
+/* En ce moment */
+.shelf-now{display:flex;gap:22px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:max(18px,env(safe-area-inset-left,0px));margin:0 calc(-1 * max(18px,env(safe-area-inset-left,0px)));padding:6px max(18px,env(safe-area-inset-left,0px)) 10px;scrollbar-width:none}
+.shelf-now::-webkit-scrollbar{display:none}
+.now{scroll-snap-align:start;flex:none;width:128px;display:flex;flex-direction:column;gap:12px}
+.now .cloth{position:relative}
+.now .t{font-family:var(--serif);font-size:16px;font-weight:500;line-height:1.2;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.now .a{font-size:13px;color:var(--dim);margin-top:2px}
+.ribbon{position:absolute;z-index:3;top:-3px;right:4%;width:9px;height:30%;background:var(--ribbon);clip-path:polygon(0 0,100% 0,100% 100%,50% 86%,0 100%);box-shadow:0 2px 4px rgba(0,0,0,.4)}
 
-.now{display:grid;gap:10px}
-.bookcard{display:flex;gap:14px;align-items:center;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;box-shadow:var(--shadow)}
-.bc-title{font-weight:800;font-size:16px;line-height:1.25;text-wrap:balance}
-.bc-meta{font-size:13px;color:var(--muted);margin-top:2px}
-.bc-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+/* L'étagère des rotations */
+.case{background:linear-gradient(var(--wood-2),var(--wood-2));border:1px solid var(--edge);border-radius:6px;padding:16px 14px 6px;box-shadow:inset 0 10px 30px rgba(0,0,0,.35)}
+.bays{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));row-gap:26px;column-gap:0}
+.bay{display:flex;flex-direction:column;align-items:center}
+.books{height:150px;width:100%;display:flex;align-items:flex-end;justify-content:center;gap:3px;padding:0 6px;border-bottom:9px solid var(--plank);box-shadow:0 7px 0 -6px var(--plank-hi);position:relative}
+.books::after{content:"";position:absolute;left:0;right:0;bottom:-15px;height:6px;background:linear-gradient(rgba(0,0,0,.45),transparent)}
+.spine{position:relative;width:27px;border-radius:2px 2px 0 0;background-color:var(--c);
+  background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.04) 0 1px,transparent 1px 3px),linear-gradient(90deg,rgba(0,0,0,.28),rgba(255,255,255,.07) 30%,rgba(0,0,0,.1) 70%,rgba(0,0,0,.35));
+  display:flex;align-items:center;justify-content:center;overflow:visible;transition:transform .18s ease}
+.spine[data-t="pilier"]{--c:var(--pilier)} .spine[data-t="sage"]{--c:var(--sage)} .spine[data-t="plaisir"]{--c:var(--plaisir)}
+.spine .st{writing-mode:vertical-rl;transform:rotate(180deg);font-family:var(--serif);font-size:11.5px;font-weight:500;color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-height:calc(100% - 26px);letter-spacing:.02em}
+.spine.god .st{color:var(--foil)}
+.spine.god::before,.spine.god::after{content:"";position:absolute;left:3px;right:3px;height:2px;background:var(--foil);box-shadow:0 4px 0 var(--foil)}
+.spine.god::before{top:7px} .spine.god::after{bottom:12px}
+.spine.a-lire{filter:saturate(.45) brightness(.62)}
+.spine.lean{transform:rotate(-7deg);transform-origin:bottom left;margin-left:6px}
+.spine .ribbon{top:auto;bottom:100%;right:7px;width:7px;height:16px;clip-path:polygon(0 0,100% 0,100% 100%,50% 75%,0 100%);transform:translateY(4px)}
+.spine:active{transform:translateY(-6px)}
+.bay .n{margin-top:10px;font-family:var(--serif);font-style:italic;font-size:15px;color:var(--dim)}
+.bay.done .n{color:var(--foil)}
+.bay.cur .n{color:var(--paper)}
+.bay.cur .n::after{content:" · en cours";font-style:normal;font-family:var(--sans);font-size:11px;color:var(--dim)}
+.key{font-size:13px;color:var(--dim);margin:12px 2px 0;line-height:1.5}
 
-.pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px;white-space:nowrap}
-.pill.t-pilier{background:var(--pilier-soft);color:var(--pilier)} .pill.t-sage{background:var(--sage-soft);color:var(--sage)} .pill.t-plaisir{background:var(--plaisir-soft);color:var(--plaisir)}
-.pill.god{background:var(--gold-soft);color:var(--gold)}
-.pill.st-lu{color:var(--ok);border:1px solid currentColor}
-.pill.st-en-cours{background:var(--ink);color:var(--bg)}
-.pill.st-a-lire{color:var(--muted);border:1px solid var(--line)}
-.pill.cyc{background:var(--surface-2);color:var(--muted);font-family:var(--f-display);letter-spacing:.08em}
+/* Ensuite */
+.next{display:grid;gap:0;border-top:1px solid var(--edge)}
+.nx{display:flex;align-items:center;gap:16px;padding:14px 0;border-bottom:1px solid var(--edge);width:100%}
+.nx .mid{flex:1;min-width:0}
+.nx .tr{font-family:var(--serif);font-style:italic;font-size:14px}
+.nx .tr[data-t="pilier"]{color:#8EA6E0} .nx .tr[data-t="sage"]{color:#8CBFA6} .nx .tr[data-t="plaisir"]{color:#E39A86}
+.nx .t{display:block;font-family:var(--serif);font-size:19px;font-weight:500;line-height:1.2}
+.nx .s{display:block;font-size:13px;color:var(--dim);margin-top:2px}
+.chev{color:var(--dim);font-size:22px;font-family:var(--serif)}
 
-.tracks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-@media (max-width:560px){.tracks{grid-template-columns:1fr}}
-.trackcard{display:flex;gap:12px;align-items:center;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;min-width:0}
-.trackcard .lbl{display:block;font-family:var(--f-display);font-weight:700;font-size:11px;letter-spacing:.16em}
-.trackcard[data-t="pilier"] .lbl{color:var(--pilier)} .trackcard[data-t="sage"] .lbl{color:var(--sage)} .trackcard[data-t="plaisir"] .lbl{color:var(--plaisir)}
-.trackcard .tt{display:block;font-weight:800;line-height:1.25;margin-top:2px}
-.trackcard .sub{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+/* Bibliothèque */
+.searchbar{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--plank-hi);padding:10px 2px;margin-top:18px}
+.searchbar svg{width:18px;height:18px;flex:none;fill:none;stroke:var(--dim);stroke-width:1.8;stroke-linecap:round}
+.searchbar input{flex:1;min-width:0;background:none;border:0;outline:none;font-family:var(--serif);font-size:20px;color:var(--paper)}
+.searchbar input::placeholder{color:var(--dim);font-style:italic}
+.addbtn{color:var(--wood);background:var(--foil);border-radius:999px;padding:7px 14px;font-weight:700;font-size:14px;white-space:nowrap}
+.tabs{display:flex;gap:20px;overflow-x:auto;scrollbar-width:none;margin-top:16px;padding-bottom:2px}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{font-size:15px;color:var(--dim);padding:4px 0;border-bottom:2px solid transparent;white-space:nowrap;font-weight:500}
+.tabs button[aria-pressed="true"]{color:var(--paper);border-color:var(--foil)}
+.tabs.sub button{font-size:13px}
+.tabs .n{color:var(--dim);font-variant-numeric:tabular-nums;margin-left:4px;font-size:.9em}
+.count{font-size:13px;color:var(--dim);margin:16px 0 12px}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px 14px}
+@media (min-width:600px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.gb{display:flex;flex-direction:column;gap:8px;min-width:0}
+.gb .cloth{position:relative}
+.gb .t{font-family:var(--serif);font-size:14px;line-height:1.2;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.gb .s{font-size:12px;color:var(--dim);margin-top:-4px}
+.gb.done .s{color:var(--foil)}
+.gb.unowned .cloth{opacity:.55}
 
-.rots{display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:8px}
-.rot{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 6px 9px;display:flex;flex-direction:column;align-items:center;gap:7px}
-.rot .num{font-family:var(--f-display);font-weight:700;font-size:15px;letter-spacing:.04em}
-.rot .dots{display:flex;gap:5px}
-.dot{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--c);display:inline-block}
-.dot.lu{background:var(--c)} .dot.en-cours{background:linear-gradient(90deg,var(--c) 50%,transparent 50%)}
-.dot[data-t="pilier"]{--c:var(--pilier)} .dot[data-t="sage"]{--c:var(--sage)} .dot[data-t="plaisir"]{--c:var(--plaisir)}
-.rot[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
-.rot.done .num{color:var(--muted)}
-.rotdetail{margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-.rotdetail button{display:grid;grid-template-columns:72px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:12px 14px}
-.rotdetail button:first-child{border-top:0}
-.rotdetail .k{font-family:var(--f-display);font-size:11px;letter-spacing:.14em;font-weight:700}
-.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);margin-top:10px}
-.legend span{display:inline-flex;align-items:center;gap:6px}
+/* Carnet */
+.quote{padding:26px 0;border-bottom:1px solid var(--edge)}
+.quote:first-of-type{padding-top:8px}
+.quote blockquote{margin:0;font-family:var(--serif);font-style:italic;font-size:21px;line-height:1.45;color:var(--paper);white-space:pre-wrap;overflow-wrap:anywhere;text-wrap:pretty;max-width:34em}
+.quote blockquote::before{content:"“";display:block;font-style:normal;font-size:56px;line-height:.6;height:24px;color:var(--foil)}
+.quote .src{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-top:14px;font-size:13px;color:var(--dim)}
+.quote .src button{color:var(--paper-2);font-weight:600;font-size:14px}
+.empty{font-family:var(--serif);font-style:italic;font-size:19px;color:var(--dim);padding:22px 0;line-height:1.45}
 
-.tools{display:flex;gap:8px;align-items:center}
-.search{flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px;outline:none;font-size:16px}
-.search:focus{border-color:var(--lapis)}
-.btn{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 14px;font-weight:800;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:8px}
-.btn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
-.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.btn.danger{color:var(--plaisir);border-color:var(--plaisir);background:transparent}
-.btn:disabled{opacity:.5;cursor:default}
-.btn.wide{width:100%;padding:14px}
-.chips{display:flex;gap:6px;overflow-x:auto;padding:12px 0 4px;scrollbar-width:none}
-.chips::-webkit-scrollbar{display:none}
-.chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;white-space:nowrap;color:var(--muted)}
-.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.chip .n{font-family:var(--f-mono);font-weight:400;opacity:.7;margin-left:4px}
-.count{font-size:12px;color:var(--muted);margin:8px 0}
-.list{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-.row{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:10px 14px}
-.row:first-child{border-top:0}
-.row .mid{flex:1;min-width:0}
-.row .t{font-weight:800;line-height:1.3;display:block}
-.row .a{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
-.row .right{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
-
-.note{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:10px}
-.note+.note{margin-top:10px}
-.note blockquote{margin:0;font-size:16px;line-height:1.6;white-space:pre-wrap;max-width:65ch;overflow-wrap:anywhere}
-.note .src{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
-.note .src button{background:none;border:0;padding:0;font-weight:800;color:var(--ink);text-align:left}
-.empty{border:1px dashed var(--line);border-radius:14px;padding:22px;text-align:center;color:var(--muted);font-size:14px}
-
-.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(in srgb,var(--surface) 92%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid var(--line);
+/* Barre d'onglets */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(20,15,12,.86);-webkit-backdrop-filter:blur(16px) saturate(1.2);backdrop-filter:blur(16px) saturate(1.2);border-top:1px solid var(--edge);
   padding:8px max(16px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
-.tabbar nav{max-width:720px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr 64px 1fr;gap:6px;align-items:center}
-.tab{background:none;border:0;border-radius:12px;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px;font-weight:800;color:var(--muted)}
-.tab svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.tab[aria-current="page"]{color:var(--ink);background:var(--surface-2)}
-.scanfab{justify-self:center;width:56px;height:56px;border-radius:18px;border:0;background:var(--ink);color:var(--bg);display:grid;place-items:center;box-shadow:var(--shadow);margin-top:-14px}
-.scanfab svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round}
+.tabbar nav{max-width:520px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr 72px 1fr;align-items:center}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11.5px;font-weight:600;color:var(--dim);padding:6px 0;text-align:center}
+.tab svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.tab[aria-current="page"]{color:var(--paper)}
+.tab[aria-current="page"] svg{stroke:var(--foil)}
+.fab{justify-self:center;width:58px;height:58px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#EDCB7E,var(--foil) 45%,#A7843C);color:#2A1E0E;display:grid;place-items:center;margin-top:-22px;box-shadow:0 8px 20px -4px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.4)}
+.fab svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round}
 
-.scrim{position:fixed;inset:0;z-index:40;background:rgba(10,14,22,.5);display:flex;align-items:flex-end;justify-content:center}
-.sheet{width:100%;max-width:720px;max-height:calc(100% - env(safe-area-inset-top,0px) - 12px);overflow-y:auto;overscroll-behavior:contain;background:var(--bg);border-radius:20px 20px 0 0;
-  padding:8px max(18px,env(safe-area-inset-right,0px)) calc(28px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));animation:up .22s ease-out}
-@keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
-@media (prefers-reduced-motion:reduce){.sheet{animation:none}}
-.grab{width:40px;height:4px;border-radius:4px;background:var(--line);margin:6px auto 12px}
-.sheet-head{display:flex;gap:14px;align-items:flex-start}
-.sheet-head .mid{flex:1;min-width:0}
-.sheet-head h2{margin:0;font-size:22px;line-height:1.2;text-wrap:balance}
-.sheet-head .by{color:var(--muted);margin-top:4px}
-.x{flex:none;background:var(--surface);border:1px solid var(--line);border-radius:50%;width:36px;height:36px;font-size:18px;line-height:1}
-.desc{color:var(--muted);margin:14px 0 0;max-width:65ch}
-.field-lbl{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:20px 0 8px}
-.seg{display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px}
-.seg button{border:0;background:none;border-radius:9px;padding:9px 4px;font-weight:800;font-size:14px;color:var(--muted)}
-.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.input{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 12px;outline:none;font-size:16px;font-variant-numeric:tabular-nums}
-.input:focus{border-color:var(--lapis)}
-.input.mono{font-family:var(--f-mono)}
-textarea.input{resize:vertical;line-height:1.5}
-.sm-lbl{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
-.card{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
-.card a{color:var(--lapis);font-weight:800;text-decoration:none;white-space:nowrap}
-.composer{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px}
-.composer textarea{width:100%;min-height:96px;border:0;background:none;resize:vertical;outline:none;line-height:1.55;font-size:16px}
-.partial{color:var(--muted);font-style:italic;font-size:14px}
-.composer .bar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px}
-.mic{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface-2);border-radius:999px;padding:8px 14px;font-weight:800;font-size:13px}
+/* Feuilles */
+.scrim{position:fixed;inset:0;z-index:40;background:rgba(8,6,5,.66);display:flex;align-items:flex-end;justify-content:center}
+.sheet{width:100%;max-width:640px;max-height:calc(100% - env(safe-area-inset-top,0px) - 10px);overflow-y:auto;overscroll-behavior:contain;background:var(--wood-2);border-radius:22px 22px 0 0;border-top:1px solid var(--edge);
+  padding:8px max(20px,env(safe-area-inset-right,0px)) calc(32px + env(safe-area-inset-bottom,0px)) max(20px,env(safe-area-inset-left,0px));animation:up .26s cubic-bezier(.2,.8,.2,1)}
+@keyframes up{from{transform:translateY(40px);opacity:.5}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}.spine{transition:none}}
+.grab{width:42px;height:4px;border-radius:4px;background:var(--plank);margin:6px auto 4px}
+.close{position:sticky;top:0;float:right;width:36px;height:36px;border-radius:50%;background:var(--wood-3);color:var(--paper-2);display:grid;place-items:center;font-size:20px;z-index:5}
+.hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:18px 0 6px;clear:both}
+.hero .cloth{margin-bottom:22px}
+.hero h2{margin:0;font-family:var(--serif);font-weight:500;font-size:30px;line-height:1.12;letter-spacing:-.01em;text-wrap:balance}
+.hero .by{font-family:var(--serif);font-style:italic;font-size:18px;color:var(--paper-2);margin-top:6px}
+.hero .meta{font-size:13px;color:var(--dim);margin-top:10px}
+.hero .meta .g{color:var(--foil)}
+.sheet .desc{font-family:var(--serif);font-size:17px;line-height:1.55;color:var(--paper-2);margin:18px auto 0;max-width:32em;text-align:center;text-wrap:pretty}
+.lbl{font-size:13px;font-weight:600;color:var(--dim);margin:26px 0 9px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);background:var(--wood);border:1px solid var(--edge);border-radius:12px;padding:3px;gap:3px}
+.seg button{border-radius:9px;padding:10px 4px;font-weight:600;font-size:14px;color:var(--dim);text-align:center}
+.seg button[aria-pressed="true"]{background:var(--paper);color:var(--ink)}
+.pad{background:var(--paper);color:var(--ink);border-radius:4px;padding:16px 16px 12px;box-shadow:0 12px 26px -12px rgba(0,0,0,.8);
+  background-image:repeating-linear-gradient(transparent 0 29px,rgba(42,32,25,.12) 29px 30px);background-position:0 14px}
+.pad textarea{width:100%;min-height:120px;border:0;background:none;resize:vertical;outline:none;font-family:var(--serif);font-style:italic;font-size:19px;line-height:30px;color:var(--ink)}
+.pad textarea::placeholder{color:rgba(42,32,25,.45)}
+.partial{font-family:var(--serif);font-style:italic;color:rgba(42,32,25,.55);font-size:16px}
+.pad .bar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px}
+.mic{display:inline-flex;align-items:center;gap:7px;color:var(--ink);font-weight:600;font-size:14px;padding:8px 12px;border-radius:999px;border:1px solid rgba(42,32,25,.25)}
 .mic svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
-.mic.live{background:var(--plaisir);border-color:var(--plaisir);color:#fff}
+.mic.live{background:var(--ribbon);border-color:var(--ribbon);color:#fff}
 .mic.live i{width:8px;height:8px;border-radius:50%;background:#fff;animation:pulse 1s infinite}
 @keyframes pulse{50%{opacity:.3}}
-.bnotes .note{box-shadow:none}
-.del{background:none;border:0;color:var(--muted);font-size:12px;font-weight:800;padding:2px 0}
-.del.confirm{color:var(--plaisir)}
-.hint{font-size:12px;color:var(--muted);margin-top:6px}
-.results{display:grid;gap:8px;margin-top:12px}
-.result{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px}
+.ink-btn{background:var(--ink);color:var(--paper);border-radius:999px;padding:9px 16px;font-weight:700;font-size:14px}
+.snotes .quote blockquote{font-size:18px}
+.snotes .quote blockquote::before{font-size:42px;height:18px}
+.del{color:var(--dim);font-size:13px;font-weight:600}
+.del.confirm{color:#E3826F}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid var(--edge);font-size:15px}
+.row:first-of-type{border-top:1px solid var(--edge)}
+.row .k{color:var(--dim)}
+.row a,.row .act{color:var(--foil);font-weight:600;text-decoration:none;white-space:nowrap}
+.row .v{text-align:right;min-width:0}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fields label{display:block;min-width:0}
+.fields .full{grid-column:1/-1}
+.fields span{display:block;font-size:12px;color:var(--dim);margin-bottom:5px}
+.in{width:100%;background:var(--wood);border:1px solid var(--edge);border-radius:10px;padding:11px 12px;outline:none;font-size:16px;color:var(--paper);font-variant-numeric:tabular-nums}
+.in:focus{border-color:var(--foil-dim)}
+textarea.in{resize:vertical;line-height:1.5}
+.btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;border-radius:999px;padding:14px;font-weight:700;font-size:15px;border:1px solid var(--edge);color:var(--paper)}
+.btn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+.btn.gold{background:var(--foil);color:#2A1E0E;border-color:var(--foil)}
+.btn.ghost{border-style:dashed;color:var(--paper-2)}
+.btn.danger{color:#E3826F;border-color:rgba(227,130,111,.4);margin-top:30px}
+.btn:disabled{opacity:.5}
+.stack{display:grid;gap:10px;margin-top:14px}
+.hint{font-size:13px;color:var(--dim);margin-top:8px;line-height:1.45}
+.results{display:grid;margin-top:14px}
+.result{display:flex;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--edge);width:100%}
 .result .mid{flex:1;min-width:0}
-.result .t{font-weight:800;line-height:1.25;display:block}
-.result .a{font-size:12px;color:var(--muted);display:block}
-.reader{position:relative;border-radius:16px;overflow:hidden;background:#000;aspect-ratio:3/4;max-height:58vh;margin:0 auto;width:100%}
+.result .t{display:block;font-family:var(--serif);font-size:17px;line-height:1.2}
+.result .s{display:block;font-size:12.5px;color:var(--dim);margin-top:3px}
+.result .cover{width:40px;height:60px;flex:none;border-radius:2px 4px 4px 2px;object-fit:cover;background:var(--wood-3);box-shadow:0 4px 10px -4px rgba(0,0,0,.7)}
+.reader{position:relative;border-radius:18px;overflow:hidden;background:#000;aspect-ratio:3/4;max-height:56vh;width:100%;margin-top:18px}
 .reader video{object-fit:cover!important;width:100%!important;height:100%!important}
-.reader .frame{position:absolute;left:10%;right:10%;top:38%;height:24%;border:2px solid #fff;border-radius:12px;box-shadow:0 0 0 999px rgba(0,0,0,.35);pointer-events:none}
-.reader .frame::after{content:"";position:absolute;left:8px;right:8px;top:50%;height:2px;background:#EE8A76;animation:scanline 1.6s ease-in-out infinite alternate}
-@keyframes scanline{from{transform:translateY(-28px)}to{transform:translateY(28px)}}
+.reader .frame{position:absolute;left:12%;right:12%;top:39%;height:22%;border:2px solid var(--foil);border-radius:10px;box-shadow:0 0 0 999px rgba(0,0,0,.42);pointer-events:none}
+.reader .frame::after{content:"";position:absolute;left:8px;right:8px;top:50%;height:2px;background:var(--ribbon);animation:scan 1.6s ease-in-out infinite alternate}
+@keyframes scan{from{transform:translateY(-24px)}to{transform:translateY(24px)}}
 @media (prefers-reduced-motion:reduce){.reader .frame::after{animation:none}}
-.spinner{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--ink);animation:spin .8s linear infinite;display:inline-block;vertical-align:-4px}
-@keyframes spin{to{transform:rotate(360deg)}}
-.toast{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:700;font-size:14px;max-width:calc(100% - 32px);text-align:center}
-.foot{font-size:12px;color:var(--muted);text-align:center;margin-top:28px}
+.spin{width:16px;height:16px;border-radius:50%;border:2px solid var(--edge);border-top-color:var(--foil);animation:sp .8s linear infinite;display:inline-block;vertical-align:-3px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.toast{position:fixed;left:50%;bottom:calc(108px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--paper);color:var(--ink);padding:10px 18px;border-radius:999px;font-weight:600;font-size:14px;max-width:calc(100% - 36px);text-align:center;box-shadow:0 10px 30px -8px rgba(0,0,0,.8)}
+.foot{font-size:12px;color:var(--dim);text-align:center;margin-top:30px}
+.sheet h3{font-family:var(--serif);font-weight:500;font-size:26px;margin:16px 0 4px;clear:both}
+.sheet .sub{font-family:var(--serif);font-style:italic;color:var(--paper-2);font-size:16px;margin:0}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="top">
-    <div class="brand"><small>Programme de lecture</small>Codex</div>
-    <button class="iconbtn" type="button" data-action="backup" aria-label="Sauvegarde"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></button>
+    <div class="mark">Codex<i>.</i></div>
+    <button class="round" type="button" data-action="backup" aria-label="Sauvegarde"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></button>
   </header>
-  <main id="view"><div class="empty" style="margin-top:24px">Chargement de ta bibliothèque…</div></main>
+  <main id="view"><p class="empty">Ouverture de la bibliothèque…</p></main>
 </div>
 
 <div class="tabbar"><nav aria-label="Vues">
-  <button class="tab" data-view="lecture" type="button"><svg viewBox="0 0 24 24"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v16h5.5c.8 0 1.5-.7 1.5-1.5z"/></svg>Lecture</button>
-  <button class="tab" data-view="bibliotheque" type="button"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="4" height="16" rx="1"/><rect x="10" y="4" width="4" height="16" rx="1"/><path d="m15.5 5.2 3.4-.9 3 15-3.4.9z"/></svg>Bibliothèque</button>
-  <button class="scanfab" data-action="scan" type="button" aria-label="Scanner un livre"><svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8 8v8M11 8v8M14 8v8M17 8v8"/></svg></button>
-  <button class="tab" data-view="carnet" type="button"><svg viewBox="0 0 24 24"><path d="M6 3h11a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6z"/><path d="M6 3v18M9.5 8h5M9.5 12h5"/></svg>Carnet</button>
+  <button class="tab" data-view="lecture" type="button"><svg viewBox="0 0 24 24"><path d="M3 5.5c3-1.3 6-1.3 9 .8v13c-3-2.1-6-2.1-9-.8z"/><path d="M21 5.5c-3-1.3-6-1.3-9 .8v13c3-2.1 6-2.1 9-.8z"/></svg>Lecture</button>
+  <button class="tab" data-view="bibliotheque" type="button"><svg viewBox="0 0 24 24"><path d="M4 4h4v16H4zM10 7h4v13h-4z"/><path d="m15.6 6.8 3.7-1 3 13.8-3.7 1z"/><path d="M2 21h20"/></svg>Bibliothèque</button>
+  <button class="fab" data-action="scan" type="button" aria-label="Scanner un livre"><svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8 8v8M11 8v8M14 8v8M17 8v8"/></svg></button>
+  <button class="tab" data-view="carnet" type="button"><svg viewBox="0 0 24 24"><path d="M6 3h11a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6z"/><path d="M6 3v18M10 8h5M10 12h5"/></svg>Carnet</button>
 </nav></div>
 
 <div id="sheetRoot"></div>
@@ -237,8 +264,9 @@ const TIERS = { god: "God", a: "Tiers A", b: "Tiers B" };
 const STATUS = { "a-lire": "À lire", "en-cours": "En cours", "lu": "Lu" };
 const OWN = { papier: "Papier", audible: "Audible", non: "À acheter" };
 const VIEWS = ["lecture", "bibliotheque", "carnet"];
+const VERSION = "1.2";
 
-const S = { data: null, meta: { lastExport: 0, changedAt: 0 }, view: "lecture", q: "", track: "all", status: "all", selRot: null, sheet: null };
+const S = { data: null, meta: { lastExport: 0, changedAt: 0 }, view: "lecture", q: "", track: "all", status: "all", sheet: null };
 
 function load() {
   try { const m = JSON.parse(localStorage.getItem(META) || "null"); if (m) S.meta = { ...S.meta, ...m }; } catch {}
@@ -258,9 +286,10 @@ function patchBook(id, data) { const b = bk(id); if (!b) return; Object.assign(b
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 function roman(n) { if (!n) return ""; const m = [[10,"X"],[9,"IX"],[5,"V"],[4,"IV"],[1,"I"]]; let r = ""; for (const [v, s] of m) while (n >= v) { r += s; n -= v; } return r; }
-const ini = t => ({ pilier: "P", sage: "S", plaisir: "Pl" }[t] || "?");
 function fmtDate(ms) { try { return new Date(ms).toLocaleDateString("fr-BE", { day: "numeric", month: "long", year: "numeric" }); } catch { return ""; } }
 function slug(s) { return s.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50); }
+function hash(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); }
+const plural = (n, w) => `${n} ${w}${n > 1 ? "s" : ""}`;
 let toastT;
 function toast(msg) { let el = $(".toast"); if (!el) { el = document.createElement("div"); el.className = "toast"; el.setAttribute("role", "status"); document.body.append(el); } el.textContent = msg; clearTimeout(toastT); toastT = setTimeout(() => el.remove(), 2600); }
 function isbnClean(s) { return String(s || "").replace(/[^\dXx]/g, "").toUpperCase(); }
@@ -270,17 +299,11 @@ function isbnValid(s) {
   if (s.length === 10 && /^\d{9}[\dX]$/.test(s)) { let t = 0; for (let i = 0; i < 10; i++) t += (s[i] === "X" ? 10 : +s[i]) * (10 - i); return t % 11 === 0; }
   return false;
 }
-function cover(b, size) {
-  const g = b.tier === "god" ? " god" : "";
-  const img = b.cover ? `<img src="${esc(b.cover)}" alt="" loading="lazy" onerror="this.remove()">` : "";
-  return `<span class="cov ${size}${g}" aria-hidden="true"><span class="spine" data-t="${b.track}">${ini(b.track)}</span>${img ? `<span style="position:absolute;inset:0">${img}</span>` : ""}</span>`;
-}
-function pills(b, o = {}) {
-  let h = `<span class="pill t-${b.track}">${TRACKS[b.track] || ""}</span>`;
-  if (b.tier === "god") h += `<span class="pill god">God</span>`;
-  if (o.status) h += `<span class="pill st-${b.status}">${STATUS[b.status]}</span>`;
-  if (b.cycle) h += `<span class="pill cyc">Cycle ${roman(b.cycle)}</span>`;
-  return h;
+function shortAuthor(a) { return (a || "").split(",")[0].trim(); }
+function cloth(b, size, extra = "") {
+  const img = b.cover ? `<span class="img"><img src="${esc(b.cover)}" alt="" loading="lazy" onerror="this.parentNode.remove()"></span>` : "";
+  return `<span class="cloth ${size}${b.tier === "god" ? " god" : ""}" data-t="${b.track}" aria-hidden="true">${extra}
+    <span class="ct">${esc(b.title)}</span><span class="ca">${esc(shortAuthor(b.author))}</span>${img}</span>`;
 }
 
 /* ================= Recherche de livres (Open Library + Google Books) ================= */
@@ -330,43 +353,42 @@ async function searchBooks(q) {
 
 /* ================= Vues ================= */
 function nextFor(t) { for (const r of S.data.rotations) { const b = bk(r[t]); if (b && b.status === "a-lire") return { b, r }; } return null; }
-function defaultRot() { const r = S.data.rotations.find(r => ["pilier","sage","plaisir"].some(t => bk(r[t])?.status !== "lu")); return r ? r.n : 1; }
+function curRot() { const r = S.data.rotations.find(r => ["pilier","sage","plaisir"].some(t => bk(r[t])?.status !== "lu")); return r ? r.n : null; }
 
 function viewLecture() {
   const all = books(), lus = all.filter(b => b.status === "lu").length, cur = all.filter(b => b.status === "en-cours");
   const god = all.filter(b => b.tier === "god"), godLu = god.filter(b => b.status === "lu").length, buy = all.filter(b => b.own === "non").length;
-  if (S.selRot == null) S.selRot = defaultRot();
-  const sel = S.data.rotations.find(r => r.n === S.selRot);
+  const cr = curRot();
   const stale = S.meta.changedAt > S.meta.lastExport && Date.now() - (S.meta.lastExport || 0) > 14 * 864e5;
-  let h = `<div class="ledger"><div><b>${lus}<em> / ${all.length}</em></b><span>livres lus</span></div>
-    <div><b>${godLu}<em> / ${god.length}</em></b><span>God tier lus</span></div><div><b>${buy}</b><span>à acheter</span></div></div>`;
-  if (stale) h += `<div class="banner"><span>${S.meta.lastExport ? "Dernière sauvegarde le " + fmtDate(S.meta.lastExport) + "." : "Tu n'as encore jamais sauvegardé."}</span><button type="button" data-action="backup">Sauvegarder</button></div>`;
-  h += `<h2 class="view-title">En ce moment</h2>`;
-  h += cur.length ? `<div class="now">${cur.map(b => `<button class="bookcard" type="button" data-open="${b.id}">${cover(b, "md")}
-      <span style="min-width:0"><span class="bc-title" style="display:block">${esc(b.title)}</span><span class="bc-meta" style="display:block">${esc(b.author)}${b.own === "audible" ? " · sur Audible" : ""}</span>
-      <span class="bc-row">${pills(b)}</span></span></button>`).join("")}</div>`
-    : `<div class="empty">Aucun livre en cours. Ouvre une fiche et passe-la en « En cours ».</div>`;
-  h += `<h2 class="view-title">Ensuite, par piste</h2><div class="tracks">`;
+  let h = `<p class="summary"><b>${lus} livres lus</b> sur ${all.length}, dont <span class="g">${godLu} du palier God</span>. ${cur.length ? `${plural(cur.length, "lecture")} en cours` : "Aucune lecture en cours"}, ${buy} à acheter.</p>`;
+  if (stale) h += `<div class="nudge"><span>${S.meta.lastExport ? "Dernière sauvegarde le " + fmtDate(S.meta.lastExport) + "." : "Aucune sauvegarde pour l'instant."}</span><button type="button" data-action="backup">Sauvegarder</button></div>`;
+
+  h += `<h2 class="h">En ce moment</h2>`;
+  h += cur.length ? `<div class="shelf-now">${cur.map(b => `<button class="now" type="button" data-open="${b.id}">${cloth(b, "lg", `<span class="ribbon"></span>`)}
+      <span><span class="t">${esc(b.title)}</span><span class="a" style="display:block">${esc(shortAuthor(b.author))}${b.own === "audible" ? ", sur Audible" : ""}</span></span></button>`).join("")}</div>`
+    : `<p class="empty">Rien sur la table de chevet. Choisis le prochain livre plus bas.</p>`;
+
+  h += `<h2 class="h">L'étagère <small>${S.data.rotations.length} rotations</small></h2><div class="case"><div class="bays">`;
+  for (const r of S.data.rotations) {
+    const trio = ["pilier","sage","plaisir"].map(t => bk(r[t])).filter(Boolean);
+    const done = trio.length && trio.every(b => b.status === "lu");
+    h += `<div class="bay${done ? " done" : ""}${r.n === cr ? " cur" : ""}"><div class="books">${["pilier","sage","plaisir"].map((t, i) => {
+      const b = bk(r[t]); if (!b) return "";
+      const hgt = 104 + hash(b.id) % 40, lean = i === 2 && hash(b.id + r.n) % 3 === 0;
+      return `<button class="spine ${b.status}${b.tier === "god" ? " god" : ""}${lean ? " lean" : ""}" data-t="${t}" style="height:${hgt}px" type="button" data-open="${b.id}" aria-label="${esc(b.title)}, ${STATUS[b.status]}">
+        ${b.status === "en-cours" ? `<span class="ribbon"></span>` : ""}<span class="st">${esc(b.title)}</span></button>`;
+    }).join("")}</div><span class="n">${roman(r.n)}</span></div>`;
+  }
+  h += `</div></div><p class="key">Les dos pâles restent à lire, le signet rouge marque une lecture en cours. Touche un livre pour l'ouvrir.</p>`;
+
+  h += `<h2 class="h">Ensuite</h2><div class="next">`;
   for (const t of ["pilier", "sage", "plaisir"]) {
     const n = nextFor(t);
-    h += n ? `<button class="trackcard" type="button" data-t="${t}" data-open="${n.b.id}">${cover(n.b, "sm")}<span style="min-width:0">
-        <span class="lbl">${TRACKS[t].toUpperCase()}</span><span class="tt">${esc(n.b.title)}</span>
-        <span class="sub">Rotation ${roman(n.r.n)}${n.b.own === "non" ? " · à acheter" : n.b.own === "audible" ? " · Audible" : ""}</span></span></button>`
-      : `<div class="trackcard" data-t="${t}"><span><span class="lbl">${TRACKS[t].toUpperCase()}</span><span class="sub">Piste terminée.</span></span></div>`;
+    h += n ? `<button class="nx" type="button" data-open="${n.b.id}">${cloth(n.b, "sm")}<span class="mid"><span class="tr" data-t="${t}">${TRACKS[t]}</span>
+      <span class="t">${esc(n.b.title)}</span><span class="s">Rotation ${roman(n.r.n)}${n.b.own === "non" ? ", à acheter" : n.b.own === "audible" ? ", sur Audible" : ""}</span></span><span class="chev">›</span></button>`
+      : `<div class="nx"><span class="mid"><span class="tr" data-t="${t}">${TRACKS[t]}</span><span class="s">Piste terminée.</span></span></div>`;
   }
-  h += `</div><h2 class="view-title">Les ${S.data.rotations.length} rotations</h2><div class="rots">`;
-  for (const r of S.data.rotations) {
-    const done = ["pilier","sage","plaisir"].every(t => bk(r[t])?.status === "lu");
-    h += `<button class="rot${done ? " done" : ""}" type="button" data-rot="${r.n}" aria-pressed="${r.n === S.selRot}" aria-label="Rotation ${r.n}">
-      <span class="num">${roman(r.n)}</span><span class="dots">${["pilier","sage","plaisir"].map(t => `<i class="dot ${bk(r[t])?.status || ""}" data-t="${t}"></i>`).join("")}</span></button>`;
-  }
-  h += `</div>`;
-  if (sel) h += `<div class="rotdetail">${["pilier","sage","plaisir"].map(t => { const b = bk(sel[t]); if (!b) return ""; return `
-      <button type="button" data-open="${b.id}"><span class="k" style="color:var(--${t})">${TRACKS[t].toUpperCase()}</span>
-      <span style="min-width:0"><b>${esc(b.title)}</b>${sel[t + "Reread"] ? ` <span style="color:var(--muted);font-size:12px">· relecture</span>` : ""}</span>
-      <span class="pill st-${b.status}">${STATUS[b.status]}</span></button>`; }).join("")}</div>`;
-  h += `<div class="legend"><span><i class="dot lu" data-t="pilier"></i>Lu</span><span><i class="dot en-cours" data-t="pilier"></i>En cours</span><span><i class="dot" data-t="pilier"></i>À lire</span></div>`;
-  return h;
+  return h + `</div>`;
 }
 
 function viewBiblio() {
@@ -375,121 +397,123 @@ function viewBiblio() {
     && (S.status === "all" || (S.status === "non" ? b.own === "non" : b.status === S.status))
     && (!q || `${b.title} ${b.author} ${b.isbn || ""}`.toLowerCase().includes(q)));
   const cnt = f => all.filter(f).length;
-  const chip = (k, v, l, n) => `<button class="chip" type="button" data-${k}="${v}" aria-pressed="${S[k] === v}">${l}${n != null ? `<span class="n">${n}</span>` : ""}</button>`;
-  let h = `<h2 class="view-title">Bibliothèque</h2>
-    <div class="tools"><input id="q" class="search" type="search" placeholder="Titre, auteur ou ISBN" value="${esc(S.q)}" aria-label="Rechercher" autocomplete="off">
-    <button class="btn primary" type="button" data-action="add">+ Ajouter</button></div>
-    <div class="chips">${chip("track","all","Toutes")}${chip("track","pilier","Pilier",cnt(b=>b.track==="pilier"))}${chip("track","sage","Sage",cnt(b=>b.track==="sage"))}${chip("track","plaisir","Plaisir",cnt(b=>b.track==="plaisir"))}</div>
-    <div class="chips" style="padding-top:2px">${chip("status","all","Tous statuts")}${chip("status","en-cours","En cours",cnt(b=>b.status==="en-cours"))}${chip("status","a-lire","À lire",cnt(b=>b.status==="a-lire"))}${chip("status","lu","Lus",cnt(b=>b.status==="lu"))}${chip("status","non","À acheter",cnt(b=>b.own==="non"))}</div>
-    <div class="count">${list.length} livre${list.length > 1 ? "s" : ""}</div>`;
-  h += list.length ? `<div class="list">${list.map(b => `<button class="row" type="button" data-open="${b.id}">${cover(b, "sm")}
-      <span class="mid"><span class="t">${esc(b.title)}</span><span class="a">${esc(b.author) || "Auteur à compléter"}${b.cycle ? " · Cycle " + roman(b.cycle) : ""}</span></span>
-      <span class="right"><span class="pill st-${b.status}">${STATUS[b.status]}</span>${b.tier === "god" ? `<span class="pill god">God</span>` : ""}</span></button>`).join("")}</div>`
-    : `<div class="empty">Aucun livre ne correspond. Essaie un autre filtre, ou ajoute-le.</div>`;
+  const tab = (k, v, l, n) => `<button type="button" data-${k}="${v}" aria-pressed="${S[k] === v}">${l}${n != null ? `<span class="n">${n}</span>` : ""}</button>`;
+  let h = `<div class="searchbar"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+      <input id="q" type="search" placeholder="Chercher un titre, un auteur" value="${esc(S.q)}" aria-label="Rechercher" autocomplete="off">
+      <button class="addbtn" type="button" data-action="add">Ajouter</button></div>
+    <div class="tabs">${tab("track","all","Tout")}${tab("track","pilier","Pilier",cnt(b=>b.track==="pilier"))}${tab("track","sage","Sage",cnt(b=>b.track==="sage"))}${tab("track","plaisir","Plaisir",cnt(b=>b.track==="plaisir"))}</div>
+    <div class="tabs sub">${tab("status","all","Tous")}${tab("status","en-cours","En cours",cnt(b=>b.status==="en-cours"))}${tab("status","a-lire","À lire",cnt(b=>b.status==="a-lire"))}${tab("status","lu","Lus",cnt(b=>b.status==="lu"))}${tab("status","non","À acheter",cnt(b=>b.own==="non"))}</div>
+    <p class="count">${plural(list.length, "livre")}</p>`;
+  h += list.length ? `<div class="grid">${list.map(b => `<button class="gb${b.status === "lu" ? " done" : ""}${b.own === "non" ? " unowned" : ""}" type="button" data-open="${b.id}">
+      ${cloth(b, "md", b.status === "en-cours" ? `<span class="ribbon"></span>` : "")}<span class="t">${esc(b.title)}</span>
+      <span class="s">${b.status === "lu" ? "Lu" : b.status === "en-cours" ? "En cours" : b.own === "non" ? "À acheter" : b.cycle ? "Cycle " + roman(b.cycle) : "À lire"}</span></button>`).join("")}</div>`
+    : `<p class="empty">Aucun livre ne correspond. Essaie un autre filtre, ou ajoute-le.</p>`;
   return h;
 }
 
 function viewCarnet() {
   const notes = [...S.data.notes].sort((a, b) => b.at - a.at);
-  let h = `<h2 class="view-title">Carnet de réflexions</h2>`;
-  if (!notes.length) return h + `<div class="empty">Ton carnet est vide. Ouvre un livre et note ce qu'il t'a fait penser.</div>`;
-  return h + notes.map(n => { const b = bk(n.bookId); return `<article class="note"><blockquote>${esc(n.text)}</blockquote>
+  let h = `<h2 class="h">Carnet <small>${plural(notes.length, "réflexion")}</small></h2>`;
+  if (!notes.length) return h + `<p class="empty">Ton carnet est vide. Ouvre un livre et note ce qu'il t'a fait penser.</p>`;
+  return h + notes.map(n => { const b = bk(n.bookId); return `<article class="quote"><blockquote>${esc(n.text)}</blockquote>
     <div class="src"><button type="button" data-open="${esc(n.bookId)}">${esc(b?.title || "Livre retiré")}</button><span>${fmtDate(n.at)}</span></div></article>`; }).join("");
 }
 
 /* ================= Feuilles ================= */
-const head = (title, sub, lead = "") => `<div class="grab"></div><div class="sheet-head">${lead}<div class="mid"><h2 id="sheetTitle">${title}</h2>${sub ? `<div class="by">${sub}</div>` : ""}</div>
-  <button class="x" type="button" data-action="close" aria-label="Fermer">×</button></div>`;
-const seg = (id, map, cur, attr = "data-v") => `<div class="seg" id="${id}" role="group">${Object.keys(map).map(k => `<button type="button" ${attr}="${k}" aria-pressed="${cur === k}">${map[k]}</button>`).join("")}</div>`;
+const closeBtn = `<div class="grab"></div><button class="close" type="button" data-action="close" aria-label="Fermer">×</button>`;
+const seg = (id, map, cur) => `<div class="seg" id="${id}" role="group">${Object.keys(map).map(k => `<button type="button" data-v="${k}" aria-pressed="${cur === k}">${map[k]}</button>`).join("")}</div>`;
+const segSet = (field, map, cur) => `<div class="seg" role="group">${Object.keys(map).map(k => `<button type="button" data-set="${field}" data-val="${k}" aria-pressed="${cur === k}">${map[k]}</button>`).join("")}</div>`;
+const scanIcon = `<svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8 8v8M11 8v8M14 8v8M17 8v8"/></svg>`;
 
 function sheetBook(b) {
   const notes = S.data.notes.filter(n => n.bookId === b.id).sort((x, y) => y.at - x.at);
-  return head(esc(b.title), esc(b.author) || "Auteur à compléter", cover(b, "lg")) + `
-  <div class="bc-row" style="margin-top:12px">${pills(b)}${b.tier !== "god" ? `<span class="pill cyc">${TIERS[b.tier] || ""}</span>` : ""}</div>
+  const meta = [TRACKS[b.track], b.tier === "god" ? `<span class="g">palier God</span>` : TIERS[b.tier], b.cycle ? "cycle " + roman(b.cycle) : ""].filter(Boolean).join(", ");
+  return closeBtn + `<div class="hero">${cloth(b, "xl", b.status === "en-cours" ? `<span class="ribbon"></span>` : "")}
+    <h2 id="sheetTitle">${esc(b.title)}</h2><div class="by">${esc(b.author) || "Auteur à compléter"}</div><div class="meta">${meta}</div></div>
   ${b.desc ? `<p class="desc">${esc(b.desc)}</p>` : ""}
-  <div class="field-lbl">Statut</div><div class="seg" role="group">${Object.keys(STATUS).map(k => `<button type="button" data-set="status" data-val="${k}" aria-pressed="${b.status === k}">${STATUS[k]}</button>`).join("")}</div>
-  <div class="field-lbl">Je l'ai en</div><div class="seg" role="group">${Object.keys(OWN).map(k => `<button type="button" data-set="own" data-val="${k}" aria-pressed="${b.own === k}">${OWN[k]}</button>`).join("")}</div>
-  <div class="field-lbl">Réflexions · ${notes.length}</div>
-  <div class="composer"><textarea id="noteTxt" placeholder="Ce que ce livre te fait penser…" aria-label="Nouvelle réflexion"></textarea>
+  <div class="lbl">Où j'en suis</div>${segSet("status", STATUS, b.status)}
+  <div class="lbl">Je l'ai en</div>${segSet("own", OWN, b.own)}
+  <div class="lbl">Ce que ce livre me fait penser</div>
+  <div class="pad"><textarea id="noteTxt" placeholder="Écris ou dicte une réflexion…" aria-label="Nouvelle réflexion"></textarea>
     <div class="partial" id="partial"></div>
-    <div class="bar">${Speech ? `<button class="mic" type="button" id="micBtn">${micIcon}<span>Dicter</span></button>` : "<span></span>"}<button class="btn primary" type="button" data-action="saveNote">Enregistrer</button></div></div>
-  <div class="bnotes" style="margin-top:10px">${notes.map(n => `<article class="note"><blockquote>${esc(n.text)}</blockquote>
+    <div class="bar">${Speech ? `<button class="mic" type="button" id="micBtn">${micIcon}<span>Dicter</span></button>` : "<span></span>"}<button class="ink-btn" type="button" data-action="saveNote">Enregistrer</button></div></div>
+  <div class="snotes">${notes.map(n => `<article class="quote"><blockquote>${esc(n.text)}</blockquote>
     <div class="src"><span>${fmtDate(n.at)}</span><button class="del" type="button" data-del="${n.id}">Supprimer</button></div></article>`).join("")}</div>
-  <div class="field-lbl">Audible</div>
-  <div class="card"><span>${esc(b.audible || "Pas encore vérifié")}</span>${b.audibleUrl ? `<a href="${esc(b.audibleUrl)}" target="_blank" rel="noopener">Ouvrir ↗</a>` : ""}</div>
-  <div class="field-lbl">Édition</div>
-  <div class="card"><span>${b.isbn ? `<span style="font-family:var(--f-mono)">${esc(b.isbn)}</span>${b.pages ? ` · ${b.pages} pages` : ""}` : "Aucune édition liée"}</span>
-    <button class="btn" type="button" data-action="findEdition">${b.isbn ? "Changer" : "Trouver"}</button></div>
-  <div class="field-lbl">Fiche</div>
-  <div class="grid2">
-    <label style="grid-column:1/-1"><span class="sm-lbl">Titre</span><input class="input" id="e-title" value="${esc(b.title)}"></label>
-    <label><span class="sm-lbl">Auteur</span><input class="input" id="e-author" value="${esc(b.author)}"></label>
-    <label><span class="sm-lbl">Cycle</span><input class="input mono" id="e-cycle" inputmode="numeric" value="${b.cycle ?? ""}" placeholder="—"></label>
-    <label><span class="sm-lbl">ISBN</span><input class="input mono" id="e-isbn" inputmode="numeric" value="${esc(b.isbn || "")}" placeholder="978…"></label>
-    <label><span class="sm-lbl">Pages</span><input class="input mono" id="e-pages" inputmode="numeric" value="${b.pages ?? ""}" placeholder="—"></label></div>
-  <div class="field-lbl">Piste</div><div class="seg" role="group">${Object.keys(TRACKS).map(k => `<button type="button" data-set="track" data-val="${k}" aria-pressed="${b.track === k}">${TRACKS[k]}</button>`).join("")}</div>
-  <div class="field-lbl">Palier</div><div class="seg" role="group">${Object.keys(TIERS).map(k => `<button type="button" data-set="tier" data-val="${k}" aria-pressed="${b.tier === k}">${TIERS[k]}</button>`).join("")}</div>
-  <button class="btn danger wide" type="button" data-action="delBook" style="margin-top:26px">Retirer ce livre</button>`;
+  <div class="lbl">Détails</div>
+  <div class="row"><span class="k">Audible</span><span class="v">${b.audibleUrl ? `<a href="${esc(b.audibleUrl)}" target="_blank" rel="noopener">${esc(b.audible || "Ouvrir")} ↗</a>` : esc(b.audible || "Pas vérifié")}</span></div>
+  <div class="row"><span class="k">Édition</span><span class="v">${b.isbn ? `${esc(b.isbn)}${b.pages ? `, ${b.pages} pages` : ""}` : "Aucune"} <button class="act" type="button" data-action="findEdition" style="margin-left:8px">${b.isbn ? "Changer" : "Trouver"}</button></span></div>
+  <div class="lbl">Modifier la fiche</div>
+  <div class="fields">
+    <label class="full"><span>Titre</span><input class="in" id="e-title" value="${esc(b.title)}"></label>
+    <label><span>Auteur</span><input class="in" id="e-author" value="${esc(b.author)}"></label>
+    <label><span>Cycle</span><input class="in" id="e-cycle" inputmode="numeric" value="${b.cycle ?? ""}" placeholder="Aucun"></label>
+    <label><span>ISBN</span><input class="in" id="e-isbn" inputmode="numeric" value="${esc(b.isbn || "")}" placeholder="978…"></label>
+    <label><span>Pages</span><input class="in" id="e-pages" inputmode="numeric" value="${b.pages ?? ""}" placeholder="—"></label></div>
+  <div class="lbl">Piste</div>${segSet("track", TRACKS, b.track)}
+  <div class="lbl">Palier</div>${segSet("tier", TIERS, b.tier)}
+  <button class="btn danger" type="button" data-action="delBook">Retirer ce livre</button>`;
 }
 
 function sheetAdd(prefill = {}) {
-  return head("Ajouter un livre", "Cherche par titre ou ISBN, ou scanne le code-barres.") + `
-  <div class="tools" style="margin-top:16px"><input class="search" id="a-q" placeholder="Ex. Crime et Châtiment" value="${esc(prefill.q || "")}" enterkeyhint="search" autocomplete="off">
-    <button class="btn" type="button" data-action="searchAdd">Chercher</button></div>
-  <button class="btn wide" type="button" data-action="scan" style="margin-top:10px"><svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8 8v8M11 8v8M14 8v8M17 8v8"/></svg>Scanner le code-barres</button>
+  return closeBtn + `<h3 id="sheetTitle">Ajouter un livre</h3><p class="sub">Par son titre, son ISBN ou son code-barres.</p>
+  <div class="searchbar"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+    <input id="a-q" placeholder="Crime et Châtiment" value="${esc(prefill.q || "")}" enterkeyhint="search" autocomplete="off"></div>
+  <div class="stack"><button class="btn gold" type="button" data-action="searchAdd">Chercher</button>
+  <button class="btn" type="button" data-action="scan">${scanIcon}Scanner le code-barres</button></div>
   <div id="results" class="results"></div>
-  <button class="btn wide" type="button" data-action="manual" style="margin-top:14px;border-style:dashed">Saisir à la main</button>`;
+  <div class="stack"><button class="btn ghost" type="button" data-action="manual">Saisir à la main</button></div>`;
 }
 
 function sheetForm(p = {}) {
-  return head("Nouveau livre", p.isbn ? `ISBN <span style="font-family:var(--f-mono)">${esc(p.isbn)}</span>` : "Vérifie et complète.",
-    cover({ track: "pilier", tier: "a", cover: p.cover }, "lg")) + `
-  <div class="grid2" style="margin-top:16px">
-    <label style="grid-column:1/-1"><span class="sm-lbl">Titre</span><input class="input" id="f-title" value="${esc(p.title || "")}"></label>
-    <label><span class="sm-lbl">Auteur</span><input class="input" id="f-author" value="${esc(p.author || "")}"></label>
-    <label><span class="sm-lbl">Cycle</span><input class="input mono" id="f-cycle" inputmode="numeric" placeholder="optionnel"></label>
-    <label><span class="sm-lbl">ISBN</span><input class="input mono" id="f-isbn" inputmode="numeric" value="${esc(p.isbn || "")}"></label>
-    <label><span class="sm-lbl">Pages</span><input class="input mono" id="f-pages" inputmode="numeric" value="${p.pages ?? ""}"></label>
-    <label style="grid-column:1/-1"><span class="sm-lbl">Résumé</span><textarea class="input" id="f-desc" rows="2">${esc(p.desc || "")}</textarea></label></div>
+  const fake = { title: p.title || "Nouveau livre", author: p.author || "", track: "pilier", tier: "a", cover: p.cover };
+  return closeBtn + `<div class="hero">${cloth(fake, "lg")}<h2 id="sheetTitle">Nouveau livre</h2><div class="meta">${p.isbn ? "ISBN " + esc(p.isbn) : "Vérifie et complète la fiche."}</div></div>
+  <div class="fields" style="margin-top:14px">
+    <label class="full"><span>Titre</span><input class="in" id="f-title" value="${esc(p.title || "")}"></label>
+    <label><span>Auteur</span><input class="in" id="f-author" value="${esc(p.author || "")}"></label>
+    <label><span>Cycle</span><input class="in" id="f-cycle" inputmode="numeric" placeholder="Aucun"></label>
+    <label><span>ISBN</span><input class="in" id="f-isbn" inputmode="numeric" value="${esc(p.isbn || "")}"></label>
+    <label><span>Pages</span><input class="in" id="f-pages" inputmode="numeric" value="${p.pages ?? ""}"></label>
+    <label class="full"><span>Résumé</span><textarea class="in" id="f-desc" rows="2">${esc(p.desc || "")}</textarea></label></div>
   <input type="hidden" id="f-cover" value="${esc(p.cover || "")}">
-  <div class="field-lbl">Piste</div>${seg("f-track", TRACKS, "pilier")}
-  <div class="field-lbl">Palier</div>${seg("f-tier", TIERS, "a")}
-  <div class="field-lbl">Je l'ai en</div>${seg("f-own", OWN, "papier")}
-  <div class="field-lbl">Statut</div>${seg("f-status", STATUS, "a-lire")}
-  <button class="btn primary wide" type="button" data-action="saveNew" style="margin-top:22px">Ajouter à la bibliothèque</button>`;
+  <div class="lbl">Piste</div>${seg("f-track", TRACKS, "pilier")}
+  <div class="lbl">Palier</div>${seg("f-tier", TIERS, "a")}
+  <div class="lbl">Je l'ai en</div>${seg("f-own", OWN, "papier")}
+  <div class="lbl">Où j'en suis</div>${seg("f-status", STATUS, "a-lire")}
+  <div class="stack" style="margin-top:26px"><button class="btn gold" type="button" data-action="saveNew">Ajouter à la bibliothèque</button></div>`;
 }
 
 function sheetScan() {
-  return head("Scanner", "Vise le code-barres au dos du livre.") + `
-  <div class="reader" style="margin-top:16px"><div id="reader" style="width:100%;height:100%"></div><div class="frame"></div></div>
-  <div class="hint" id="scanHint" style="text-align:center;margin-top:10px">Ouverture de la caméra…</div>
-  <div class="tools" style="margin-top:14px"><input class="search" id="s-isbn" inputmode="numeric" placeholder="Ou tape l'ISBN" autocomplete="off"><button class="btn" type="button" data-action="isbnGo">OK</button></div>`;
+  return closeBtn + `<h3 id="sheetTitle">Scanner</h3><p class="sub">Vise le code-barres au dos du livre.</p>
+  <div class="reader"><div id="reader" style="width:100%;height:100%"></div><div class="frame"></div></div>
+  <p class="hint" id="scanHint" style="text-align:center">Ouverture de la caméra…</p>
+  <div class="searchbar"><input id="s-isbn" inputmode="numeric" placeholder="Ou tape l'ISBN" autocomplete="off"><button class="addbtn" type="button" data-action="isbnGo">OK</button></div>`;
 }
 
 function sheetEdition(b) {
-  return head("Trouver l'édition", esc(b.title)) + `
-  <div class="tools" style="margin-top:16px"><input class="search" id="ed-q" value="${esc((b.title + " " + (b.author || "")).trim())}" enterkeyhint="search" autocomplete="off">
-    <button class="btn" type="button" data-action="searchEdition">Chercher</button></div>
-  <div class="hint">Choisis ton édition : on récupère l'ISBN, les pages et la couverture. Le titre reste le tien.</div>
+  return closeBtn + `<h3 id="sheetTitle">Trouver l'édition</h3><p class="sub">${esc(b.title)}</p>
+  <div class="searchbar"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+    <input id="ed-q" value="${esc((b.title + " " + (b.author || "")).trim())}" enterkeyhint="search" autocomplete="off"><button class="addbtn" type="button" data-action="searchEdition">Chercher</button></div>
+  <p class="hint">Choisis ton édition : l'ISBN, les pages et la couverture sont récupérés. Le titre reste le tien.</p>
   <div id="results" class="results"></div>`;
 }
 
 function sheetBackup() {
-  const n = S.data.books.length, nn = S.data.notes.length;
-  return head("Sauvegarde", "Tes données vivent sur cet appareil. Exporte-les de temps en temps.") + `
-  <div class="card" style="margin-top:16px"><span>${n} livres · ${nn} réflexions</span><span style="font-size:12px;color:var(--muted)">${S.meta.lastExport ? "Sauvé le " + fmtDate(S.meta.lastExport) : "Jamais sauvé"}</span></div>
-  <button class="btn primary wide" type="button" data-action="export" style="margin-top:14px">Exporter une sauvegarde</button>
-  <div class="hint">Sur iPhone, choisis « Enregistrer dans Fichiers » ou envoie-la-toi par mail.</div>
-  <button class="btn wide" type="button" data-action="import" style="margin-top:14px">Restaurer depuis un fichier</button>
+  return closeBtn + `<h3 id="sheetTitle">Sauvegarde</h3><p class="sub">Tes données vivent sur ce téléphone. Exporte-les de temps en temps.</p>
+  <div class="lbl">Contenu</div>
+  <div class="row"><span class="k">Bibliothèque</span><span class="v">${plural(S.data.books.length, "livre")}, ${plural(S.data.notes.length, "réflexion")}</span></div>
+  <div class="row"><span class="k">Dernier export</span><span class="v">${S.meta.lastExport ? fmtDate(S.meta.lastExport) : "Jamais"}</span></div>
+  <div class="stack" style="margin-top:22px"><button class="btn gold" type="button" data-action="export">Exporter une sauvegarde</button>
+  <button class="btn" type="button" data-action="import">Restaurer depuis un fichier</button></div>
+  <p class="hint">Sur iPhone, choisis « Enregistrer dans Fichiers » ou envoie-la-toi par mail.</p>
   <div id="importConfirm"></div>
-  <p class="foot">Codex · version 1.1 · données stockées localement · recherche via Open Library et Google Books</p>`;
+  <p class="foot">Codex, version ${VERSION}. Recherche via Open Library et Google Books.</p>`;
 }
 
 function resultsHTML(list, action) {
-  if (!list.length) return `<div class="empty">Rien trouvé. Essaie avec l'auteur, ou saisis-le à la main.</div>`;
-  return list.map((r, i) => `<button class="result" type="button" data-${action}="${i}">${cover({ track: "pilier", tier: "a", cover: r.cover }, "sm")}
-    <span class="mid"><span class="t">${esc(r.title)}</span><span class="a">${esc(r.author)}${r.publisher ? " · " + esc(r.publisher) : ""}${r.year ? " · " + esc(r.year) : ""}</span>
-    <span class="a" style="font-family:var(--f-mono)">${r.isbn ? esc(r.isbn) : "sans ISBN"}${r.pages ? " · " + r.pages + " p." : ""}</span></span></button>`).join("");
+  if (!list.length) return `<p class="empty">Rien trouvé. Essaie avec l'auteur, ou saisis-le à la main.</p>`;
+  return list.map((r, i) => `<button class="result" type="button" data-${action}="${i}">${r.cover ? `<img class="cover" src="${esc(r.cover)}" alt="" loading="lazy">` : `<span class="cover"></span>`}
+    <span class="mid"><span class="t">${esc(r.title)}</span><span class="s">${esc(shortAuthor(r.author))}${r.publisher ? ", " + esc(r.publisher) : ""}${r.year ? ", " + esc(r.year) : ""}</span>
+    <span class="s">${r.isbn ? "ISBN " + esc(r.isbn) : "Sans ISBN"}${r.pages ? `, ${r.pages} pages` : ""}</span></span></button>`).join("");
 }
 
 /* ================= Rendu ================= */
@@ -511,9 +535,9 @@ function openSheet(kind, arg) {
   $("#sheetRoot").innerHTML = `<div class="scrim" data-scrim><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">${html}</div></div>`;
   document.body.style.overflow = "hidden";
   if (kind === "scan") startScan();
-  else if (kind === "edition") doSearch($("#ed-q").value, "pickEdition");
+  else if (kind === "edition") doSearch($("#ed-q").value, "pickedition");
   else if (kind === "add") $("#a-q").focus();
-  else $(".x")?.focus({ preventScroll: true });
+  else $(".close")?.focus({ preventScroll: true });
 }
 function refreshBookSheet() {
   const b = bk(S.sheet.arg); if (!b) return closeSheet();
@@ -533,20 +557,20 @@ let lastResults = [];
 async function doSearch(q, action) {
   q = (q || "").trim(); const box = $("#results"); if (!box) return;
   if (!q) { box.innerHTML = ""; return; }
-  if (!navigator.onLine) { box.innerHTML = `<div class="empty">Pas de connexion. Saisis le livre à la main pour l'instant.</div>`; return; }
-  box.innerHTML = `<div class="hint"><span class="spinner"></span> Recherche…</div>`;
+  if (!navigator.onLine) { box.innerHTML = `<p class="empty">Pas de connexion. Saisis le livre à la main pour l'instant.</p>`; return; }
+  box.innerHTML = `<p class="hint"><span class="spin"></span>Recherche…</p>`;
   try {
     if (isbnValid(q)) { const r = await lookupIsbn(q); lastResults = r ? [r] : []; }
     else lastResults = await searchBooks(q);
     if ($("#results")) $("#results").innerHTML = resultsHTML(lastResults, action);
-  } catch { if ($("#results")) $("#results").innerHTML = `<div class="empty">La recherche n'a pas répondu. Réessaie dans un instant.</div>`; }
+  } catch { if ($("#results")) $("#results").innerHTML = `<p class="empty">La recherche n'a pas répondu. Réessaie dans un instant.</p>`; }
 }
 async function handleIsbn(isbn) {
   isbn = isbnClean(isbn);
   if (!isbnValid(isbn)) { toast("Ce n'est pas un ISBN valide."); return; }
   const dup = S.data.books.find(b => isbnClean(b.isbn) === isbn);
   if (dup) { toast("Déjà dans ta bibliothèque"); openSheet("book", dup.id); return; }
-  const hint = $("#scanHint"); if (hint) hint.innerHTML = `<span class="spinner"></span> Recherche de ${isbn}…`;
+  const hint = $("#scanHint"); if (hint) hint.innerHTML = `<span class="spin"></span>Recherche de ${isbn}…`;
   let r = null; try { r = navigator.onLine ? await lookupIsbn(isbn) : null; } catch {}
   if (r) {
     const twin = S.data.books.find(b => !b.isbn && slug(b.title) === slug(r.title));
@@ -572,11 +596,11 @@ async function startScan() {
     let done = false;
     await scanner.start({ facingMode: "environment" }, { fps: 12, aspectRatio: 0.75, disableFlip: true }, async text => {
       if (done) return; const c = isbnClean(text);
-      if (!isbnValid(c) || !/^97[89]/.test(c) && c.length === 13) { if (hint()) hint().textContent = "Ce code n'est pas un ISBN. Vise le code commençant par 978."; return; }
+      if (!isbnValid(c) || (c.length === 13 && !/^97[89]/.test(c))) { if (hint()) hint().textContent = "Ce code n'est pas un ISBN. Vise celui qui commence par 978."; return; }
       done = true; try { navigator.vibrate?.(40); } catch {}
       await stopScan(); handleIsbn(c);
     }, () => {});
-    if (hint()) hint().textContent = "Place le code-barres dans le cadre.";
+    if (hint()) hint().textContent = "Place le code-barres dans le cadre doré.";
   } catch (e) {
     const msg = String(e?.name || e || "");
     if (hint()) hint().textContent = /NotAllowed|Permission/i.test(msg) ? "Accès à la caméra refusé. Autorise-le dans les réglages, ou tape l'ISBN." : "Caméra indisponible ici. Tape l'ISBN ci-dessous.";
@@ -588,7 +612,7 @@ async function stopScan() { const s = scanner; scanner = null; if (s) { try { if
 const Speech = window.SpeechRecognition || window.webkitSpeechRecognition || null;
 const micIcon = `<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>`;
 let rec = null;
-function setMic(on) { const b = $("#micBtn"); if (!b) return; b.classList.toggle("live", on); b.innerHTML = on ? `<i></i><span>J'écoute… Stop</span>` : `${micIcon}<span>Dicter</span>`; }
+function setMic(on) { const b = $("#micBtn"); if (!b) return; b.classList.toggle("live", on); b.innerHTML = on ? `<i></i><span>J'écoute, touche pour arrêter</span>` : `${micIcon}<span>Dicter</span>`; }
 function startDict() {
   if (!Speech) return;
   rec = new Speech(); rec.lang = "fr-FR"; rec.interimResults = true; rec.continuous = true;
@@ -626,9 +650,8 @@ $("#importFile").addEventListener("change", async e => {
     const d = JSON.parse(await f.text());
     if (d.app !== "codex" || !Array.isArray(d.books) || !Array.isArray(d.rotations) || !Array.isArray(d.notes)) throw 0;
     pendingImport = d;
-    const box = $("#importConfirm"); if (box) box.innerHTML = `<div class="card" style="margin-top:12px;display:grid;gap:10px">
-      <span>Remplacer tes données actuelles (${S.data.books.length} livres) par cette sauvegarde du ${fmtDate(Date.parse(d.exportedAt))} (${d.books.length} livres, ${d.notes.length} réflexions) ?</span>
-      <span style="display:flex;gap:8px"><button class="btn primary" type="button" data-action="importYes">Remplacer</button><button class="btn" type="button" data-action="importNo">Annuler</button></span></div>`;
+    const box = $("#importConfirm"); if (box) box.innerHTML = `<p class="hint" style="margin-top:18px;color:var(--paper-2)">Remplacer tes données actuelles (${plural(S.data.books.length, "livre")}) par la sauvegarde du ${fmtDate(Date.parse(d.exportedAt))} (${plural(d.books.length, "livre")}, ${plural(d.notes.length, "réflexion")}) ?</p>
+      <div class="stack"><button class="btn gold" type="button" data-action="importYes">Remplacer</button><button class="btn" type="button" data-action="importNo">Annuler</button></div>`;
   } catch { toast("Ce fichier n'est pas une sauvegarde Codex."); }
 });
 
@@ -639,7 +662,6 @@ document.addEventListener("click", e => {
   const a = t.dataset.action;
   if (t.dataset.view) { S.view = t.dataset.view; history.replaceState(null, "", "#" + S.view); render(); scrollTo({ top: 0 }); return; }
   if (t.dataset.open) { lastFocus = t; openSheet("book", t.dataset.open); return; }
-  if (t.dataset.rot) { S.selRot = +t.dataset.rot; render(); return; }
   if (t.dataset.track) { S.track = t.dataset.track; render(); return; }
   if (t.dataset.status) { S.status = t.dataset.status; render(); return; }
   if (t.dataset.set) { patchBook(S.sheet.arg, { [t.dataset.set]: t.dataset.val, ...(t.dataset.set === "track" ? { tracks: [t.dataset.val] } : {}) }); return; }
@@ -676,7 +698,7 @@ document.addEventListener("click", e => {
       persist(); render(); toast("Ajouté à la bibliothèque"); openSheet("book", id); break;
     }
     case "delBook": {
-      if (!t.classList.contains("confirm")) { t.classList.add("confirm"); t.textContent = "Toucher encore pour retirer définitivement"; break; }
+      if (!t.classList.contains("confirm")) { t.classList.add("confirm"); t.textContent = "Touche encore pour retirer définitivement"; break; }
       const id = S.sheet.arg; S.data.books = S.data.books.filter(b => b.id !== id); S.data.notes = S.data.notes.filter(n => n.bookId !== id);
       persist(); closeSheet(); render(); toast("Livre retiré"); break;
     }

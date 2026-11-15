@@ -1,7 +1,8 @@
 // Codex — service worker : l'appli fonctionne hors ligne, les recherches restent en ligne.
-const SHELL = "codex-shell-v2";
+const SHELL = "codex-shell-v3";
 const RUNTIME = "codex-runtime-v1";
 const FILES = ["./", "index.html", "manifest.webmanifest", "seed.json", "vendor/html5-qrcode.min.js",
+  "fonts/newsreader-latin-opsz-normal.woff2", "fonts/newsreader-latin-opsz-italic.woff2", "fonts/hanken-grotesk-latin-wght-normal.woff2",
   "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 
 self.addEventListener("install", e => {

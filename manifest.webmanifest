@@ -1,0 +1,17 @@
+{
+  "name": "Codex — programme de lecture",
+  "short_name": "Codex",
+  "description": "Rotations Pilier, Sage et Plaisir, bibliothèque, scan ISBN et carnet de réflexions.",
+  "lang": "fr",
+  "start_url": "./#lecture",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EEF0EC",
+  "theme_color": "#161C27",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,17 @@
+CODEX — mise en ligne (une fois, environ 10 minutes)
+
+1. Va sur https://app.netlify.com/drop et crée un compte gratuit.
+2. Dézippe codex-pwa.zip, puis glisse le dossier « codex-pwa » sur la page.
+3. Netlify te donne une adresse en https (tu peux la renommer, par ex. codex-axel.netlify.app).
+
+Installer sur le téléphone
+- iPhone : ouvre l'adresse dans Safari > bouton Partager > « Sur l'écran d'accueil ».
+- Android : ouvre l'adresse dans Chrome > menu > « Installer l'application ».
+Utilise ensuite toujours l'icône : sur iPhone, les données de l'icône et celles de Safari sont séparées.
+
+Tes données
+- Elles sont stockées sur le téléphone. Bouton en haut à droite > « Exporter une sauvegarde » de temps en temps.
+- Changement de téléphone : exporte sur l'ancien, puis « Restaurer depuis un fichier » sur le nouveau.
+
+Mettre à jour l'appli
+- Glisse le nouveau dossier sur la page « Deploys » de ton site Netlify. Tes données ne bougent pas.

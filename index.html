@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Codex</title>
+<meta name="description" content="Programme de lecture d'Axel : rotations, bibliothèque et carnet.">
+<meta name="theme-color" content="#EEF0EC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E1320" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Codex">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout : une colonne mobile d'abord, trois vues (Lecture, Bibliothèque, Carnet), barre d'onglets en bas, fiches en feuilles glissantes. */
+:root{
+  --bg:#EEF0EC; --surface:#FFFFFF; --surface-2:#F6F7F4; --ink:#161C27; --muted:#5D6573; --line:#D9DDD5;
+  --lapis:#2442A8; --gold:#9A7019; --gold-soft:#F5ECD6;
+  --pilier:#2442A8; --sage:#22735F; --plaisir:#B4432F;
+  --pilier-soft:#E3E8F8; --sage-soft:#DDEFE8; --plaisir-soft:#F8E4DF;
+  --ok:#22735F; --warn:#9A7019; --on-spine:#FFFFFF;
+  --shadow:0 1px 2px rgba(22,28,39,.06),0 8px 24px rgba(22,28,39,.07);
+  --f-display:"Cinzel","Trajan Pro",Georgia,serif;
+  --f-body:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0E1320; --surface:#161D2C; --surface-2:#1B2335; --ink:#ECE9E1; --muted:#9AA2B1; --line:#283247;
+  --lapis:#8DA6FF; --gold:#DDB257; --gold-soft:#33291A;
+  --pilier:#8DA6FF; --sage:#5FC7A9; --plaisir:#EE8A76;
+  --pilier-soft:#1F2A4A; --sage-soft:#173229; --plaisir-soft:#3A221D;
+  --ok:#5FC7A9; --warn:#DDB257; --on-spine:#0E1320;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35); color-scheme:dark}}
+
+*{box-sizing:border-box}
+html{background:var(--bg);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:env(safe-area-inset-top,0px) calc(92px + env(safe-area-inset-bottom,0px))}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+img{max-width:100%}
+[hidden]{display:none!important}
+:focus-visible{outline:2px solid var(--lapis);outline-offset:2px;border-radius:6px}
+.wrap{max-width:720px;margin:0 auto}
+
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding-block:18px 4px}
+.brand{font-family:var(--f-display);font-weight:700;font-size:28px;letter-spacing:.06em;line-height:1}
+.brand small{display:block;font-family:var(--f-body);font-weight:700;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.iconbtn{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center}
+.iconbtn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.view-title{font-family:var(--f-display);font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin:26px 0 12px;display:flex;align-items:center;gap:10px;font-weight:600}
+.view-title::after{content:"";flex:1;height:1px;background:var(--line)}
+
+.ledger{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:16px}
+.ledger div{background:var(--surface);padding:12px 14px}
+.ledger b{display:block;font-family:var(--f-mono);font-weight:500;font-size:22px;font-variant-numeric:tabular-nums;line-height:1.2}
+.ledger span{font-size:12px;color:var(--muted)}
+.ledger em{font-style:normal;color:var(--muted);font-size:14px}
+
+.banner{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;background:var(--gold-soft);color:var(--ink);border-radius:12px;padding:10px 14px;font-size:13px}
+.banner button{border:0;background:var(--ink);color:var(--bg);border-radius:10px;padding:7px 12px;font-weight:700;font-size:13px;white-space:nowrap}
+
+/* Couverture ou dos */
+.cov{position:relative;flex:none;border-radius:4px 7px 7px 4px;overflow:hidden;background:var(--surface-2);box-shadow:inset 4px 0 0 rgba(0,0,0,.18)}
+.cov img{width:100%;height:100%;object-fit:cover;display:block}
+.cov.lg{width:72px;height:108px} .cov.md{width:52px;height:76px} .cov.sm{width:32px;height:48px}
+.spine{width:100%;height:100%;display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px;font-family:var(--f-display);font-weight:700;font-size:13px;color:var(--on-spine)}
+.cov.sm .spine{font-size:10px;padding-bottom:4px}
+.spine[data-t="pilier"]{background:var(--pilier)} .spine[data-t="sage"]{background:var(--sage)} .spine[data-t="plaisir"]{background:var(--plaisir)}
+.cov.god .spine::before{content:"";position:absolute;top:9px;left:9px;right:9px;height:2px;background:var(--gold);box-shadow:0 5px 0 var(--gold)}
+.cov.sm.god .spine::before{top:6px;left:6px;right:6px;height:1.5px;box-shadow:0 3px 0 var(--gold)}
+
+.now{display:grid;gap:10px}
+.bookcard{display:flex;gap:14px;align-items:center;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;box-shadow:var(--shadow)}
+.bc-title{font-weight:800;font-size:16px;line-height:1.25;text-wrap:balance}
+.bc-meta{font-size:13px;color:var(--muted);margin-top:2px}
+.bc-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px;white-space:nowrap}
+.pill.t-pilier{background:var(--pilier-soft);color:var(--pilier)} .pill.t-sage{background:var(--sage-soft);color:var(--sage)} .pill.t-plaisir{background:var(--plaisir-soft);color:var(--plaisir)}
+.pill.god{background:var(--gold-soft);color:var(--gold)}
+.pill.st-lu{color:var(--ok);border:1px solid currentColor}
+.pill.st-en-cours{background:var(--ink);color:var(--bg)}
+.pill.st-a-lire{color:var(--muted);border:1px solid var(--line)}
+.pill.cyc{background:var(--surface-2);color:var(--muted);font-family:var(--f-display);letter-spacing:.08em}
+
+.tracks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:560px){.tracks{grid-template-columns:1fr}}
+.trackcard{display:flex;gap:12px;align-items:center;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;min-width:0}
+.trackcard .lbl{display:block;font-family:var(--f-display);font-weight:700;font-size:11px;letter-spacing:.16em}
+.trackcard[data-t="pilier"] .lbl{color:var(--pilier)} .trackcard[data-t="sage"] .lbl{color:var(--sage)} .trackcard[data-t="plaisir"] .lbl{color:var(--plaisir)}
+.trackcard .tt{display:block;font-weight:800;line-height:1.25;margin-top:2px}
+.trackcard .sub{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+
+.rots{display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:8px}
+.rot{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 6px 9px;display:flex;flex-direction:column;align-items:center;gap:7px}
+.rot .num{font-family:var(--f-display);font-weight:700;font-size:15px;letter-spacing:.04em}
+.rot .dots{display:flex;gap:5px}
+.dot{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--c);display:inline-block}
+.dot.lu{background:var(--c)} .dot.en-cours{background:linear-gradient(90deg,var(--c) 50%,transparent 50%)}
+.dot[data-t="pilier"]{--c:var(--pilier)} .dot[data-t="sage"]{--c:var(--sage)} .dot[data-t="plaisir"]{--c:var(--plaisir)}
+.rot[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.rot.done .num{color:var(--muted)}
+.rotdetail{margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.rotdetail button{display:grid;grid-template-columns:72px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:12px 14px}
+.rotdetail button:first-child{border-top:0}
+.rotdetail .k{font-family:var(--f-display);font-size:11px;letter-spacing:.14em;font-weight:700}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+
+.tools{display:flex;gap:8px;align-items:center}
+.search{flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px;outline:none;font-size:16px}
+.search:focus{border-color:var(--lapis)}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 14px;font-weight:800;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.danger{color:var(--plaisir);border-color:var(--plaisir);background:transparent}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.wide{width:100%;padding:14px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:12px 0 4px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;white-space:nowrap;color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip .n{font-family:var(--f-mono);font-weight:400;opacity:.7;margin-left:4px}
+.count{font-size:12px;color:var(--muted);margin:8px 0}
+.list{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.row{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:10px 14px}
+.row:first-child{border-top:0}
+.row .mid{flex:1;min-width:0}
+.row .t{font-weight:800;line-height:1.3;display:block}
+.row .a{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.row .right{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+
+.note{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:10px}
+.note+.note{margin-top:10px}
+.note blockquote{margin:0;font-size:16px;line-height:1.6;white-space:pre-wrap;max-width:65ch;overflow-wrap:anywhere}
+.note .src{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+.note .src button{background:none;border:0;padding:0;font-weight:800;color:var(--ink);text-align:left}
+.empty{border:1px dashed var(--line);border-radius:14px;padding:22px;text-align:center;color:var(--muted);font-size:14px}
+
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(in srgb,var(--surface) 92%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid var(--line);
+  padding:8px max(16px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.tabbar nav{max-width:720px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr 64px 1fr;gap:6px;align-items:center}
+.tab{background:none;border:0;border-radius:12px;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px;font-weight:800;color:var(--muted)}
+.tab svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tab[aria-current="page"]{color:var(--ink);background:var(--surface-2)}
+.scanfab{justify-self:center;width:56px;height:56px;border-radius:18px;border:0;background:var(--ink);color:var(--bg);display:grid;place-items:center;box-shadow:var(--shadow);margin-top:-14px}
+.scanfab svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round}
+
+.scrim{position:fixed;inset:0;z-index:40;background:rgba(10,14,22,.5);display:flex;align-items:flex-end;justify-content:center}
+.sheet{width:100%;max-width:720px;max-height:calc(100% - env(safe-area-inset-top,0px) - 12px);overflow-y:auto;overscroll-behavior:contain;background:var(--bg);border-radius:20px 20px 0 0;
+  padding:8px max(18px,env(safe-area-inset-right,0px)) calc(28px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));animation:up .22s ease-out}
+@keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}}
+.grab{width:40px;height:4px;border-radius:4px;background:var(--line);margin:6px auto 12px}
+.sheet-head{display:flex;gap:14px;align-items:flex-start}
+.sheet-head .mid{flex:1;min-width:0}
+.sheet-head h2{margin:0;font-size:22px;line-height:1.2;text-wrap:balance}
+.sheet-head .by{color:var(--muted);margin-top:4px}
+.x{flex:none;background:var(--surface);border:1px solid var(--line);border-radius:50%;width:36px;height:36px;font-size:18px;line-height:1}
+.desc{color:var(--muted);margin:14px 0 0;max-width:65ch}
+.field-lbl{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:20px 0 8px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px}
+.seg button{border:0;background:none;border-radius:9px;padding:9px 4px;font-weight:800;font-size:14px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.input{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 12px;outline:none;font-size:16px;font-variant-numeric:tabular-nums}
+.input:focus{border-color:var(--lapis)}
+.input.mono{font-family:var(--f-mono)}
+textarea.input{resize:vertical;line-height:1.5}
+.sm-lbl{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+.card{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.card a{color:var(--lapis);font-weight:800;text-decoration:none;white-space:nowrap}
+.composer{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px}
+.composer textarea{width:100%;min-height:96px;border:0;background:none;resize:vertical;outline:none;line-height:1.55;font-size:16px}
+.partial{color:var(--muted);font-style:italic;font-size:14px}
+.composer .bar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px}
+.mic{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface-2);border-radius:999px;padding:8px 14px;font-weight:800;font-size:13px}
+.mic svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.mic.live{background:var(--plaisir);border-color:var(--plaisir);color:#fff}
+.mic.live i{width:8px;height:8px;border-radius:50%;background:#fff;animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.3}}
+.bnotes .note{box-shadow:none}
+.del{background:none;border:0;color:var(--muted);font-size:12px;font-weight:800;padding:2px 0}
+.del.confirm{color:var(--plaisir)}
+.hint{font-size:12px;color:var(--muted);margin-top:6px}
+.results{display:grid;gap:8px;margin-top:12px}
+.result{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px}
+.result .mid{flex:1;min-width:0}
+.result .t{font-weight:800;line-height:1.25;display:block}
+.result .a{font-size:12px;color:var(--muted);display:block}
+.reader{position:relative;border-radius:16px;overflow:hidden;background:#000;aspect-ratio:3/4;max-height:58vh;margin:0 auto;width:100%}
+.reader video{object-fit:cover!important;width:100%!important;height:100%!important}
+.reader .frame{position:absolute;left:10%;right:10%;top:38%;height:24%;border:2px solid #fff;border-radius:12px;box-shadow:0 0 0 999px rgba(0,0,0,.35);pointer-events:none}
+.reader .frame::after{content:"";position:absolute;left:8px;right:8px;top:50%;height:2px;background:#EE8A76;animation:scanline 1.6s ease-in-out infinite alternate}
+@keyframes scanline{from{transform:translateY(-28px)}to{transform:translateY(28px)}}
+@media (prefers-reduced-motion:reduce){.reader .frame::after{animation:none}}
+.spinner{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--ink);animation:spin .8s linear infinite;display:inline-block;vertical-align:-4px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:700;font-size:14px;max-width:calc(100% - 32px);text-align:center}
+.foot{font-size:12px;color:var(--muted);text-align:center;margin-top:28px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><small>Programme de lecture</small>Codex</div>
+    <button class="iconbtn" type="button" data-action="backup" aria-label="Sauvegarde"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></button>
+  </header>
+  <main id="view"><div class="empty" style="margin-top:24px">Chargement de ta bibliothèque…</div></main>
+</div>
+
+<div class="tabbar"><nav aria-label="Vues">
+  <button class="tab" data-view="lecture" type="button"><svg viewBox="0 0 24 24"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v16h5.5c.8 0 1.5-.7 1.5-1.5z"/></svg>Lecture</button>
+  <button class="tab" data-view="bibliotheque" type="button"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="4" height="16" rx="1"/><rect x="10" y="4" width="4" height="16" rx="1"/><path d="m15.5 5.2 3.4-.9 3 15-3.4.9z"/></svg>Bibliothèque</button>
+  <button class="scanfab" data-action="scan" type="button" aria-label="Scanner un livre"><svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8 8v8M11 8v8M14 8v8M17 8v8"/></svg></button>
+  <button class="tab" data-view="carnet" type="button"><svg viewBox="0 0 24 24"><path d="M6 3h11a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6z"/><path d="M6 3v18M9.5 8h5M9.5 12h5"/></svg>Carnet</button>
+</nav></div>
+
+<div id="sheetRoot"></div>
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+
+<script>
+"use strict";
+/* ================= Données ================= */
+const KEY = "codex.data.v1", META = "codex.meta.v1";
+const TRACKS = { pilier: "Pilier", sage: "Sage", plaisir: "Plaisir" };
+const TIERS = { god: "God", a: "Tiers A", b: "Tiers B" };
+const STATUS = { "a-lire": "À lire", "en-cours": "En cours", "lu": "Lu" };
+const OWN = { papier: "Papier", audible: "Audible", non: "À acheter" };
+const VIEWS = ["lecture", "bibliotheque", "carnet"];
+
+const S = { data: null, meta: { lastExport: 0, changedAt: 0 }, view: "lecture", q: "", track: "all", status: "all", selRot: null, sheet: null };
+
+function load() {
+  try { const m = JSON.parse(localStorage.getItem(META) || "null"); if (m) S.meta = { ...S.meta, ...m }; } catch {}
+  try { const d = JSON.parse(localStorage.getItem(KEY) || "null"); if (d && Array.isArray(d.books)) return d; } catch {}
+  return null;
+}
+function persist(touch = true) {
+  if (touch) S.meta.changedAt = Date.now();
+  try { localStorage.setItem(KEY, JSON.stringify(S.data)); localStorage.setItem(META, JSON.stringify(S.meta)); }
+  catch { toast("Espace de stockage plein : exporte une sauvegarde."); }
+}
+const books = () => [...S.data.books].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+const bk = id => S.data.books.find(b => b.id === id);
+function patchBook(id, data) { const b = bk(id); if (!b) return; Object.assign(b, data, { updatedAt: Date.now() }); persist(); render(); }
+
+/* ================= Utilitaires ================= */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function roman(n) { if (!n) return ""; const m = [[10,"X"],[9,"IX"],[5,"V"],[4,"IV"],[1,"I"]]; let r = ""; for (const [v, s] of m) while (n >= v) { r += s; n -= v; } return r; }
+const ini = t => ({ pilier: "P", sage: "S", plaisir: "Pl" }[t] || "?");
+function fmtDate(ms) { try { return new Date(ms).toLocaleDateString("fr-BE", { day: "numeric", month: "long", year: "numeric" }); } catch { return ""; } }
+function slug(s) { return s.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50); }
+let toastT;
+function toast(msg) { let el = $(".toast"); if (!el) { el = document.createElement("div"); el.className = "toast"; el.setAttribute("role", "status"); document.body.append(el); } el.textContent = msg; clearTimeout(toastT); toastT = setTimeout(() => el.remove(), 2600); }
+function isbnClean(s) { return String(s || "").replace(/[^\dXx]/g, "").toUpperCase(); }
+function isbnValid(s) {
+  s = isbnClean(s);
+  if (s.length === 13 && /^\d{13}$/.test(s)) { let t = 0; for (let i = 0; i < 12; i++) t += +s[i] * (i % 2 ? 3 : 1); return (10 - t % 10) % 10 === +s[12]; }
+  if (s.length === 10 && /^\d{9}[\dX]$/.test(s)) { let t = 0; for (let i = 0; i < 10; i++) t += (s[i] === "X" ? 10 : +s[i]) * (10 - i); return t % 11 === 0; }
+  return false;
+}
+function cover(b, size) {
+  const g = b.tier === "god" ? " god" : "";
+  const img = b.cover ? `<img src="${esc(b.cover)}" alt="" loading="lazy" onerror="this.remove()">` : "";
+  return `<span class="cov ${size}${g}" aria-hidden="true"><span class="spine" data-t="${b.track}">${ini(b.track)}</span>${img ? `<span style="position:absolute;inset:0">${img}</span>` : ""}</span>`;
+}
+function pills(b, o = {}) {
+  let h = `<span class="pill t-${b.track}">${TRACKS[b.track] || ""}</span>`;
+  if (b.tier === "god") h += `<span class="pill god">God</span>`;
+  if (o.status) h += `<span class="pill st-${b.status}">${STATUS[b.status]}</span>`;
+  if (b.cycle) h += `<span class="pill cyc">Cycle ${roman(b.cycle)}</span>`;
+  return h;
+}
+
+/* ================= Recherche de livres (Open Library + Google Books) ================= */
+async function getJSON(url, ms = 9000) {
+  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), ms);
+  try { const r = await fetch(url, { signal: ac.signal }); if (!r.ok) throw new Error(r.status); return await r.json(); }
+  finally { clearTimeout(t); }
+}
+const https = u => u ? u.replace(/^http:/, "https:").replace("&edge=curl", "") : "";
+function fromGB(item) {
+  const v = item.volumeInfo || {};
+  const ids = v.industryIdentifiers || [];
+  const isbn = (ids.find(i => i.type === "ISBN_13") || ids.find(i => i.type === "ISBN_10") || {}).identifier || "";
+  return { title: v.title + (v.subtitle && v.subtitle.length < 40 ? " : " + v.subtitle : ""), author: (v.authors || []).join(", "), pages: v.pageCount || null,
+    desc: (v.description || "").replace(/<[^>]+>/g, "").slice(0, 260), isbn, cover: https(v.imageLinks?.thumbnail || v.imageLinks?.smallThumbnail), publisher: v.publisher || "", year: (v.publishedDate || "").slice(0, 4) };
+}
+async function lookupIsbn(isbn) {
+  isbn = isbnClean(isbn);
+  const [ol, gb] = await Promise.allSettled([
+    getJSON(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`),
+    getJSON(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`)
+  ]);
+  const o = ol.status === "fulfilled" ? ol.value[`ISBN:${isbn}`] : null;
+  const g = gb.status === "fulfilled" && gb.value.items?.length ? fromGB(gb.value.items[0]) : null;
+  if (!o && !g) return null;
+  return {
+    isbn, title: g?.title || o?.title || "", author: g?.author || (o?.authors || []).map(a => a.name).join(", "),
+    pages: g?.pages || o?.number_of_pages || null, desc: g?.desc || "",
+    cover: https(o?.cover?.medium) || g?.cover || "", publisher: g?.publisher || (o?.publishers?.[0]?.name || ""), year: g?.year || (o?.publish_date || "").slice(-4)
+  };
+}
+async function searchBooks(q) {
+  const [gb, ol] = await Promise.allSettled([
+    getJSON(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&printType=books&maxResults=10&langRestrict=fr`),
+    getJSON(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=6&fields=title,author_name,isbn,number_of_pages_median,cover_i`)
+  ]);
+  const out = [];
+  if (gb.status === "fulfilled") for (const it of gb.value.items || []) out.push(fromGB(it));
+  if (ol.status === "fulfilled") for (const d of ol.value.docs || []) {
+    const isbn = (d.isbn || []).find(x => x.length === 13 && x.startsWith("978")) || (d.isbn || [])[0] || "";
+    out.push({ title: d.title, author: (d.author_name || []).slice(0, 2).join(", "), pages: d.number_of_pages_median || null, desc: "", isbn,
+      cover: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : "", publisher: "", year: "" });
+  }
+  const seen = new Set();
+  return out.filter(r => r.title && !seen.has((r.isbn || r.title + r.author)) && seen.add(r.isbn || r.title + r.author)).slice(0, 12);
+}
+
+/* ================= Vues ================= */
+function nextFor(t) { for (const r of S.data.rotations) { const b = bk(r[t]); if (b && b.status === "a-lire") return { b, r }; } return null; }
+function defaultRot() { const r = S.data.rotations.find(r => ["pilier","sage","plaisir"].some(t => bk(r[t])?.status !== "lu")); return r ? r.n : 1; }
+
+function viewLecture() {
+  const all = books(), lus = all.filter(b => b.status === "lu").length, cur = all.filter(b => b.status === "en-cours");
+  const god = all.filter(b => b.tier === "god"), godLu = god.filter(b => b.status === "lu").length, buy = all.filter(b => b.own === "non").length;
+  if (S.selRot == null) S.selRot = defaultRot();
+  const sel = S.data.rotations.find(r => r.n === S.selRot);
+  const stale = S.meta.changedAt > S.meta.lastExport && Date.now() - (S.meta.lastExport || 0) > 14 * 864e5;
+  let h = `<div class="ledger"><div><b>${lus}<em> / ${all.length}</em></b><span>livres lus</span></div>
+    <div><b>${godLu}<em> / ${god.length}</em></b><span>God tier lus</span></div><div><b>${buy}</b><span>à acheter</span></div></div>`;
+  if (stale) h += `<div class="banner"><span>${S.meta.lastExport ? "Dernière sauvegarde le " + fmtDate(S.meta.lastExport) + "." : "Tu n'as encore jamais sauvegardé."}</span><button type="button" data-action="backup">Sauvegarder</button></div>`;
+  h += `<h2 class="view-title">En ce moment</h2>`;
+  h += cur.length ? `<div class="now">${cur.map(b => `<button class="bookcard" type="button" data-open="${b.id}">${cover(b, "md")}
+      <span style="min-width:0"><span class="bc-title" style="display:block">${esc(b.title)}</span><span class="bc-meta" style="display:block">${esc(b.author)}${b.own === "audible" ? " · sur Audible" : ""}</span>
+      <span class="bc-row">${pills(b)}</span></span></button>`).join("")}</div>`
+    : `<div class="empty">Aucun livre en cours. Ouvre une fiche et passe-la en « En cours ».</div>`;
+  h += `<h2 class="view-title">Ensuite, par piste</h2><div class="tracks">`;
+  for (const t of ["pilier", "sage", "plaisir"]) {
+    const n = nextFor(t);
+    h += n ? `<button class="trackcard" type="button" data-t="${t}" data-open="${n.b.id}">${cover(n.b, "sm")}<span style="min-width:0">
+        <span class="lbl">${TRACKS[t].toUpperCase()}</span><span class="tt">${esc(n.b.title)}</span>
+        <span class="sub">Rotation ${roman(n.r.n)}${n.b.own === "non" ? " · à acheter" : n.b.own === "audible" ? " · Audible" : ""}</span></span></button>`
+      : `<div class="trackcard" data-t="${t}"><span><span class="lbl">${TRACKS[t].toUpperCase()}</span><span class="sub">Piste terminée.</span></span></div>`;
+  }
+  h += `</div><h2 class="view-title">Les ${S.data.rotations.length} rotations</h2><div class="rots">`;
+  for (const r of S.data.rotations) {
+    const done = ["pilier","sage","plaisir"].every(t => bk(r[t])?.status === "lu");
+    h += `<button class="rot${done ? " done" : ""}" type="button" data-rot="${r.n}" aria-pressed="${r.n === S.selRot}" aria-label="Rotation ${r.n}">
+      <span class="num">${roman(r.n)}</span><span class="dots">${["pilier","sage","plaisir"].map(t => `<i class="dot ${bk(r[t])?.status || ""}" data-t="${t}"></i>`).join("")}</span></button>`;
+  }
+  h += `</div>`;
+  if (sel) h += `<div class="rotdetail">${["pilier","sage","plaisir"].map(t => { const b = bk(sel[t]); if (!b) return ""; return `
+      <button type="button" data-open="${b.id}"><span class="k" style="color:var(--${t})">${TRACKS[t].toUpperCase()}</span>
+      <span style="min-width:0"><b>${esc(b.title)}</b>${sel[t + "Reread"] ? ` <span style="color:var(--muted);font-size:12px">· relecture</span>` : ""}</span>
+      <span class="pill st-${b.status}">${STATUS[b.status]}</span></button>`; }).join("")}</div>`;
+  h += `<div class="legend"><span><i class="dot lu" data-t="pilier"></i>Lu</span><span><i class="dot en-cours" data-t="pilier"></i>En cours</span><span><i class="dot" data-t="pilier"></i>À lire</span></div>`;
+  return h;
+}
+
+function viewBiblio() {
+  const all = books(), q = S.q.trim().toLowerCase();
+  const list = all.filter(b => (S.track === "all" || (b.tracks || [b.track]).includes(S.track))
+    && (S.status === "all" || (S.status === "non" ? b.own === "non" : b.status === S.status))
+    && (!q || `${b.title} ${b.author} ${b.isbn || ""}`.toLowerCase().includes(q)));
+  const cnt = f => all.filter(f).length;
+  const chip = (k, v, l, n) => `<button class="chip" type="button" data-${k}="${v}" aria-pressed="${S[k] === v}">${l}${n != null ? `<span class="n">${n}</span>` : ""}</button>`;
+  let h = `<h2 class="view-title">Bibliothèque</h2>
+    <div class="tools"><input id="q" class="search" type="search" placeholder="Titre, auteur ou ISBN" value="${esc(S.q)}" aria-label="Rechercher" autocomplete="off">
+    <button class="btn primary" type="button" data-action="add">+ Ajouter</button></div>
+    <div class="chips">${chip("track","all","Toutes")}${chip("track","pilier","Pilier",cnt(b=>b.track==="pilier"))}${chip("track","sage","Sage",cnt(b=>b.track==="sage"))}${chip("track","plaisir","Plaisir",cnt(b=>b.track==="plaisir"))}</div>
+    <div class="chips" style="padding-top:2px">${chip("status","all","Tous statuts")}${chip("status","en-cours","En cours",cnt(b=>b.status==="en-cours"))}${chip("status","a-lire","À lire",cnt(b=>b.status==="a-lire"))}${chip("status","lu","Lus",cnt(b=>b.status==="lu"))}${chip("status","non","À acheter",cnt(b=>b.own==="non"))}</div>
+    <div class="count">${list.length} livre${list.length > 1 ? "s" : ""}</div>`;
+  h += list.length ? `<div class="list">${list.map(b => `<button class="row" type="button" data-open="${b.id}">${cover(b, "sm")}
+      <span class="mid"><span class="t">${esc(b.title)}</span><span class="a">${esc(b.author) || "Auteur à compléter"}${b.cycle ? " · Cycle " + roman(b.cycle) : ""}</span></span>
+      <span class="right"><span class="pill st-${b.status}">${STATUS[b.status]}</span>${b.tier === "god" ? `<span class="pill god">God</span>` : ""}</span></button>`).join("")}</div>`
+    : `<div class="empty">Aucun livre ne correspond. Essaie un autre filtre, ou ajoute-le.</div>`;
+  return h;
+}
+
+function viewCarnet() {
+  const notes = [...S.data.notes].sort((a, b) => b.at - a.at);
+  let h = `<h2 class="view-title">Carnet de réflexions</h2>`;
+  if (!notes.length) return h + `<div class="empty">Ton carnet est vide. Ouvre un livre et note ce qu'il t'a fait penser.</div>`;
+  return h + notes.map(n => { const b = bk(n.bookId); return `<article class="note"><blockquote>${esc(n.text)}</blockquote>
+    <div class="src"><button type="button" data-open="${esc(n.bookId)}">${esc(b?.title || "Livre retiré")}</button><span>${fmtDate(n.at)}</span></div></article>`; }).join("");
+}
+
+/* ================= Feuilles ================= */
+const head = (title, sub, lead = "") => `<div class="grab"></div><div class="sheet-head">${lead}<div class="mid"><h2 id="sheetTitle">${title}</h2>${sub ? `<div class="by">${sub}</div>` : ""}</div>
+  <button class="x" type="button" data-action="close" aria-label="Fermer">×</button></div>`;
+const seg = (id, map, cur, attr = "data-v") => `<div class="seg" id="${id}" role="group">${Object.keys(map).map(k => `<button type="button" ${attr}="${k}" aria-pressed="${cur === k}">${map[k]}</button>`).join("")}</div>`;
+
+function sheetBook(b) {
+  const notes = S.data.notes.filter(n => n.bookId === b.id).sort((x, y) => y.at - x.at);
+  return head(esc(b.title), esc(b.author) || "Auteur à compléter", cover(b, "lg")) + `
+  <div class="bc-row" style="margin-top:12px">${pills(b)}${b.tier !== "god" ? `<span class="pill cyc">${TIERS[b.tier] || ""}</span>` : ""}</div>
+  ${b.desc ? `<p class="desc">${esc(b.desc)}</p>` : ""}
+  <div class="field-lbl">Statut</div><div class="seg" role="group">${Object.keys(STATUS).map(k => `<button type="button" data-set="status" data-val="${k}" aria-pressed="${b.status === k}">${STATUS[k]}</button>`).join("")}</div>
+  <div class="field-lbl">Je l'ai en</div><div class="seg" role="group">${Object.keys(OWN).map(k => `<button type="button" data-set="own" data-val="${k}" aria-pressed="${b.own === k}">${OWN[k]}</button>`).join("")}</div>
+  <div class="field-lbl">Réflexions · ${notes.length}</div>
+  <div class="composer"><textarea id="noteTxt" placeholder="Ce que ce livre te fait penser…" aria-label="Nouvelle réflexion"></textarea>
+    <div class="partial" id="partial"></div>
+    <div class="bar">${Speech ? `<button class="mic" type="button" id="micBtn">${micIcon}<span>Dicter</span></button>` : "<span></span>"}<button class="btn primary" type="button" data-action="saveNote">Enregistrer</button></div></div>
+  <div class="bnotes" style="margin-top:10px">${notes.map(n => `<article class="note"><blockquote>${esc(n.text)}</blockquote>
+    <div class="src"><span>${fmtDate(n.at)}</span><button class="del" type="button" data-del="${n.id}">Supprimer</button></div></article>`).join("")}</div>
+  <div class="field-lbl">Audible</div>
+  <div class="card"><span>${esc(b.audible || "Pas encore vérifié")}</span>${b.audibleUrl ? `<a href="${esc(b.audibleUrl)}" target="_blank" rel="noopener">Ouvrir ↗</a>` : ""}</div>
+  <div class="field-lbl">Édition</div>
+  <div class="card"><span>${b.isbn ? `<span style="font-family:var(--f-mono)">${esc(b.isbn)}</span>${b.pages ? ` · ${b.pages} pages` : ""}` : "Aucune édition liée"}</span>
+    <button class="btn" type="button" data-action="findEdition">${b.isbn ? "Changer" : "Trouver"}</button></div>
+  <div class="field-lbl">Fiche</div>
+  <div class="grid2">
+    <label style="grid-column:1/-1"><span class="sm-lbl">Titre</span><input class="input" id="e-title" value="${esc(b.title)}"></label>
+    <label><span class="sm-lbl">Auteur</span><input class="input" id="e-author" value="${esc(b.author)}"></label>
+    <label><span class="sm-lbl">Cycle</span><input class="input mono" id="e-cycle" inputmode="numeric" value="${b.cycle ?? ""}" placeholder="—"></label>
+    <label><span class="sm-lbl">ISBN</span><input class="input mono" id="e-isbn" inputmode="numeric" value="${esc(b.isbn || "")}" placeholder="978…"></label>
+    <label><span class="sm-lbl">Pages</span><input class="input mono" id="e-pages" inputmode="numeric" value="${b.pages ?? ""}" placeholder="—"></label></div>
+  <div class="field-lbl">Piste</div><div class="seg" role="group">${Object.keys(TRACKS).map(k => `<button type="button" data-set="track" data-val="${k}" aria-pressed="${b.track === k}">${TRACKS[k]}</button>`).join("")}</div>
+  <div class="field-lbl">Palier</div><div class="seg" role="group">${Object.keys(TIERS).map(k => `<button type="button" data-set="tier" data-val="${k}" aria-pressed="${b.tier === k}">${TIERS[k]}</button>`).join("")}</div>
+  <button class="btn danger wide" type="button" data-action="delBook" style="margin-top:26px">Retirer ce livre</button>`;
+}
+
+function sheetAdd(prefill = {}) {
+  return head("Ajouter un livre", "Cherche par titre ou ISBN, ou scanne le code-barres.") + `
+  <div class="tools" style="margin-top:16px"><input class="search" id="a-q" placeholder="Ex. Crime et Châtiment" value="${esc(prefill.q || "")}" enterkeyhint="search" autocomplete="off">
+    <button class="btn" type="button" data-action="searchAdd">Chercher</button></div>
+  <button class="btn wide" type="button" data-action="scan" style="margin-top:10px"><svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8 8v8M11 8v8M14 8v8M17 8v8"/></svg>Scanner le code-barres</button>
+  <div id="results" class="results"></div>
+  <button class="btn wide" type="button" data-action="manual" style="margin-top:14px;border-style:dashed">Saisir à la main</button>`;
+}
+
+function sheetForm(p = {}) {
+  return head("Nouveau livre", p.isbn ? `ISBN <span style="font-family:var(--f-mono)">${esc(p.isbn)}</span>` : "Vérifie et complète.",
+    cover({ track: "pilier", tier: "a", cover: p.cover }, "lg")) + `
+  <div class="grid2" style="margin-top:16px">
+    <label style="grid-column:1/-1"><span class="sm-lbl">Titre</span><input class="input" id="f-title" value="${esc(p.title || "")}"></label>
+    <label><span class="sm-lbl">Auteur</span><input class="input" id="f-author" value="${esc(p.author || "")}"></label>
+    <label><span class="sm-lbl">Cycle</span><input class="input mono" id="f-cycle" inputmode="numeric" placeholder="optionnel"></label>
+    <label><span class="sm-lbl">ISBN</span><input class="input mono" id="f-isbn" inputmode="numeric" value="${esc(p.isbn || "")}"></label>
+    <label><span class="sm-lbl">Pages</span><input class="input mono" id="f-pages" inputmode="numeric" value="${p.pages ?? ""}"></label>
+    <label style="grid-column:1/-1"><span class="sm-lbl">Résumé</span><textarea class="input" id="f-desc" rows="2">${esc(p.desc || "")}</textarea></label></div>
+  <input type="hidden" id="f-cover" value="${esc(p.cover || "")}">
+  <div class="field-lbl">Piste</div>${seg("f-track", TRACKS, "pilier")}
+  <div class="field-lbl">Palier</div>${seg("f-tier", TIERS, "a")}
+  <div class="field-lbl">Je l'ai en</div>${seg("f-own", OWN, "papier")}
+  <div class="field-lbl">Statut</div>${seg("f-status", STATUS, "a-lire")}
+  <button class="btn primary wide" type="button" data-action="saveNew" style="margin-top:22px">Ajouter à la bibliothèque</button>`;
+}
+
+function sheetScan() {
+  return head("Scanner", "Vise le code-barres au dos du livre.") + `
+  <div class="reader" style="margin-top:16px"><div id="reader" style="width:100%;height:100%"></div><div class="frame"></div></div>
+  <div class="hint" id="scanHint" style="text-align:center;margin-top:10px">Ouverture de la caméra…</div>
+  <div class="tools" style="margin-top:14px"><input class="search" id="s-isbn" inputmode="numeric" placeholder="Ou tape l'ISBN" autocomplete="off"><button class="btn" type="button" data-action="isbnGo">OK</button></div>`;
+}
+
+function sheetEdition(b) {
+  return head("Trouver l'édition", esc(b.title)) + `
+  <div class="tools" style="margin-top:16px"><input class="search" id="ed-q" value="${esc((b.title + " " + (b.author || "")).trim())}" enterkeyhint="search" autocomplete="off">
+    <button class="btn" type="button" data-action="searchEdition">Chercher</button></div>
+  <div class="hint">Choisis ton édition : on récupère l'ISBN, les pages et la couverture. Le titre reste le tien.</div>
+  <div id="results" class="results"></div>`;
+}
+
+function sheetBackup() {
+  const n = S.data.books.length, nn = S.data.notes.length;
+  return head("Sauvegarde", "Tes données vivent sur cet appareil. Exporte-les de temps en temps.") + `
+  <div class="card" style="margin-top:16px"><span>${n} livres · ${nn} réflexions</span><span style="font-size:12px;color:var(--muted)">${S.meta.lastExport ? "Sauvé le " + fmtDate(S.meta.lastExport) : "Jamais sauvé"}</span></div>
+  <button class="btn primary wide" type="button" data-action="export" style="margin-top:14px">Exporter une sauvegarde</button>
+  <div class="hint">Sur iPhone, choisis « Enregistrer dans Fichiers » ou envoie-la-toi par mail.</div>
+  <button class="btn wide" type="button" data-action="import" style="margin-top:14px">Restaurer depuis un fichier</button>
+  <div id="importConfirm"></div>
+  <p class="foot">Codex · données stockées localement · recherche via Open Library et Google Books</p>`;
+}
+
+function resultsHTML(list, action) {
+  if (!list.length) return `<div class="empty">Rien trouvé. Essaie avec l'auteur, ou saisis-le à la main.</div>`;
+  return list.map((r, i) => `<button class="result" type="button" data-${action}="${i}">${cover({ track: "pilier", tier: "a", cover: r.cover }, "sm")}
+    <span class="mid"><span class="t">${esc(r.title)}</span><span class="a">${esc(r.author)}${r.publisher ? " · " + esc(r.publisher) : ""}${r.year ? " · " + esc(r.year) : ""}</span>
+    <span class="a" style="font-family:var(--f-mono)">${r.isbn ? esc(r.isbn) : "sans ISBN"}${r.pages ? " · " + r.pages + " p." : ""}</span></span></button>`).join("");
+}
+
+/* ================= Rendu ================= */
+let lastFocus = null;
+function render() {
+  if (!S.data) return;
+  const v = $("#view");
+  const qf = document.activeElement?.id === "q", caret = qf ? document.activeElement.selectionStart : null;
+  v.innerHTML = S.view === "lecture" ? viewLecture() : S.view === "bibliotheque" ? viewBiblio() : viewCarnet();
+  if (qf) { const q = $("#q"); q.focus(); try { q.setSelectionRange(caret, caret); } catch {} }
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-current", t.dataset.view === S.view ? "page" : "false"));
+  if (S.sheet?.kind === "book") refreshBookSheet();
+}
+function openSheet(kind, arg) {
+  stopScan(); stopDict();
+  S.sheet = { kind, arg };
+  const html = kind === "book" ? sheetBook(bk(arg)) : kind === "add" ? sheetAdd(arg) : kind === "form" ? sheetForm(arg) : kind === "scan" ? sheetScan()
+    : kind === "edition" ? sheetEdition(bk(arg)) : sheetBackup();
+  $("#sheetRoot").innerHTML = `<div class="scrim" data-scrim><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">${html}</div></div>`;
+  document.body.style.overflow = "hidden";
+  if (kind === "scan") startScan();
+  else if (kind === "edition") doSearch($("#ed-q").value, "pickEdition");
+  else if (kind === "add") $("#a-q").focus();
+  else $(".x")?.focus({ preventScroll: true });
+}
+function refreshBookSheet() {
+  const b = bk(S.sheet.arg); if (!b) return closeSheet();
+  const sh = $(".sheet"); if (!sh) return;
+  const draft = $("#noteTxt")?.value || "", top = sh.scrollTop, focusId = document.activeElement?.id;
+  sh.innerHTML = sheetBook(b);
+  $("#noteTxt").value = draft; sh.scrollTop = top;
+  if (focusId && document.getElementById(focusId)) document.getElementById(focusId).focus({ preventScroll: true });
+}
+function closeSheet() {
+  stopScan(); stopDict(); S.sheet = null; $("#sheetRoot").innerHTML = ""; document.body.style.overflow = "";
+  if (lastFocus?.isConnected) lastFocus.focus({ preventScroll: true });
+}
+
+/* ================= Recherche (UI) ================= */
+let lastResults = [];
+async function doSearch(q, action) {
+  q = (q || "").trim(); const box = $("#results"); if (!box) return;
+  if (!q) { box.innerHTML = ""; return; }
+  if (!navigator.onLine) { box.innerHTML = `<div class="empty">Pas de connexion. Saisis le livre à la main pour l'instant.</div>`; return; }
+  box.innerHTML = `<div class="hint"><span class="spinner"></span> Recherche…</div>`;
+  try {
+    if (isbnValid(q)) { const r = await lookupIsbn(q); lastResults = r ? [r] : []; }
+    else lastResults = await searchBooks(q);
+    if ($("#results")) $("#results").innerHTML = resultsHTML(lastResults, action);
+  } catch { if ($("#results")) $("#results").innerHTML = `<div class="empty">La recherche n'a pas répondu. Réessaie dans un instant.</div>`; }
+}
+async function handleIsbn(isbn) {
+  isbn = isbnClean(isbn);
+  if (!isbnValid(isbn)) { toast("Ce n'est pas un ISBN valide."); return; }
+  const dup = S.data.books.find(b => isbnClean(b.isbn) === isbn);
+  if (dup) { toast("Déjà dans ta bibliothèque"); openSheet("book", dup.id); return; }
+  const hint = $("#scanHint"); if (hint) hint.innerHTML = `<span class="spinner"></span> Recherche de ${isbn}…`;
+  let r = null; try { r = navigator.onLine ? await lookupIsbn(isbn) : null; } catch {}
+  if (r) {
+    const twin = S.data.books.find(b => !b.isbn && slug(b.title) === slug(r.title));
+    if (twin) { patchBook(twin.id, { isbn, pages: r.pages || twin.pages, cover: r.cover || twin.cover }); toast("Édition liée à ton livre"); openSheet("book", twin.id); return; }
+  } else toast("ISBN introuvable en ligne : complète à la main.");
+  openSheet("form", r || { isbn });
+}
+
+/* ================= Scanner ================= */
+let scanner = null, scanLib = null;
+function loadScanLib() {
+  if (scanLib) return scanLib;
+  scanLib = new Promise((res, rej) => { const s = document.createElement("script"); s.src = "vendor/html5-qrcode.min.js"; s.onload = res; s.onerror = rej; document.head.append(s); });
+  return scanLib;
+}
+async function startScan() {
+  const hint = () => $("#scanHint");
+  try {
+    await loadScanLib();
+    if (S.sheet?.kind !== "scan") return;
+    const F = Html5QrcodeSupportedFormats;
+    scanner = new Html5Qrcode("reader", { formatsToSupport: [F.EAN_13, F.EAN_8, F.UPC_A], verbose: false, experimentalFeatures: { useBarCodeDetectorIfSupported: true } });
+    let done = false;
+    await scanner.start({ facingMode: "environment" }, { fps: 12, aspectRatio: 0.75, disableFlip: true }, async text => {
+      if (done) return; const c = isbnClean(text);
+      if (!isbnValid(c) || !/^97[89]/.test(c) && c.length === 13) { if (hint()) hint().textContent = "Ce code n'est pas un ISBN. Vise le code commençant par 978."; return; }
+      done = true; try { navigator.vibrate?.(40); } catch {}
+      await stopScan(); handleIsbn(c);
+    }, () => {});
+    if (hint()) hint().textContent = "Place le code-barres dans le cadre.";
+  } catch (e) {
+    const msg = String(e?.name || e || "");
+    if (hint()) hint().textContent = /NotAllowed|Permission/i.test(msg) ? "Accès à la caméra refusé. Autorise-le dans les réglages, ou tape l'ISBN." : "Caméra indisponible ici. Tape l'ISBN ci-dessous.";
+  }
+}
+async function stopScan() { const s = scanner; scanner = null; if (s) { try { if (s.isScanning) await s.stop(); s.clear(); } catch {} } }
+
+/* ================= Dictée ================= */
+const Speech = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+const micIcon = `<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>`;
+let rec = null;
+function setMic(on) { const b = $("#micBtn"); if (!b) return; b.classList.toggle("live", on); b.innerHTML = on ? `<i></i><span>J'écoute… Stop</span>` : `${micIcon}<span>Dicter</span>`; }
+function startDict() {
+  if (!Speech) return;
+  rec = new Speech(); rec.lang = "fr-FR"; rec.interimResults = true; rec.continuous = true;
+  rec.onresult = e => {
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) { const ta = $("#noteTxt"); if (ta) { const t = r[0].transcript.trim(); ta.value = ta.value ? ta.value.replace(/\s*$/, " ") + t : t.charAt(0).toUpperCase() + t.slice(1); } }
+      else interim += r[0].transcript;
+    }
+    const p = $("#partial"); if (p) p.textContent = interim;
+  };
+  rec.onerror = e => { if (e.error === "not-allowed") toast("Micro refusé : tu peux toujours écrire."); else if (e.error !== "aborted" && e.error !== "no-speech") toast("La dictée s'est arrêtée."); };
+  rec.onend = () => { rec = null; setMic(false); const p = $("#partial"); if (p) p.textContent = ""; };
+  try { rec.start(); setMic(true); } catch { rec = null; }
+}
+function stopDict() { if (rec) { try { rec.stop(); } catch {} } }
+
+/* ================= Sauvegarde ================= */
+async function exportData() {
+  const payload = { app: "codex", v: 1, exportedAt: new Date().toISOString(), books: S.data.books, rotations: S.data.rotations, notes: S.data.notes };
+  const name = `codex-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`;
+  const blob = new Blob([JSON.stringify(payload, null, 1)], { type: "application/json" });
+  const file = new File([blob], name, { type: "application/json" });
+  try {
+    if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: "Sauvegarde Codex" });
+    else { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
+    S.meta.lastExport = Date.now(); persist(false); toast("Sauvegarde exportée"); if (S.sheet?.kind === "backup") openSheet("backup"); render();
+  } catch (e) { if (e?.name !== "AbortError") toast("Export impossible. Réessaie."); }
+}
+let pendingImport = null;
+$("#importFile").addEventListener("change", async e => {
+  const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (d.app !== "codex" || !Array.isArray(d.books) || !Array.isArray(d.rotations) || !Array.isArray(d.notes)) throw 0;
+    pendingImport = d;
+    const box = $("#importConfirm"); if (box) box.innerHTML = `<div class="card" style="margin-top:12px;display:grid;gap:10px">
+      <span>Remplacer tes données actuelles (${S.data.books.length} livres) par cette sauvegarde du ${fmtDate(Date.parse(d.exportedAt))} (${d.books.length} livres, ${d.notes.length} réflexions) ?</span>
+      <span style="display:flex;gap:8px"><button class="btn primary" type="button" data-action="importYes">Remplacer</button><button class="btn" type="button" data-action="importNo">Annuler</button></span></div>`;
+  } catch { toast("Ce fichier n'est pas une sauvegarde Codex."); }
+});
+
+/* ================= Événements ================= */
+document.addEventListener("click", e => {
+  const t = e.target.closest("button,[data-scrim]"); if (!t) return;
+  if (t.matches("[data-scrim]")) { if (e.target === t) closeSheet(); return; }
+  const a = t.dataset.action;
+  if (t.dataset.view) { S.view = t.dataset.view; history.replaceState(null, "", "#" + S.view); render(); scrollTo({ top: 0 }); return; }
+  if (t.dataset.open) { lastFocus = t; openSheet("book", t.dataset.open); return; }
+  if (t.dataset.rot) { S.selRot = +t.dataset.rot; render(); return; }
+  if (t.dataset.track) { S.track = t.dataset.track; render(); return; }
+  if (t.dataset.status) { S.status = t.dataset.status; render(); return; }
+  if (t.dataset.set) { patchBook(S.sheet.arg, { [t.dataset.set]: t.dataset.val, ...(t.dataset.set === "track" ? { tracks: [t.dataset.val] } : {}) }); return; }
+  if (t.dataset.v && t.parentElement.classList.contains("seg")) { t.parentElement.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === t)); return; }
+  if (t.hasAttribute("data-pickadd")) { const r = lastResults[+t.dataset.pickadd]; const dup = r.isbn && S.data.books.find(b => isbnClean(b.isbn) === isbnClean(r.isbn)); if (dup) { toast("Déjà dans ta bibliothèque"); openSheet("book", dup.id); } else openSheet("form", r); return; }
+  if (t.hasAttribute("data-pickedition")) { const r = lastResults[+t.dataset.pickedition], id = S.sheet.arg; const b = bk(id);
+    patchBook(id, { isbn: r.isbn || b.isbn, pages: r.pages || b.pages, cover: r.cover || b.cover, author: b.author || r.author, desc: b.desc || r.desc }); toast("Édition liée"); openSheet("book", id); return; }
+  if (t.dataset.del) {
+    if (!t.classList.contains("confirm")) { t.classList.add("confirm"); t.textContent = "Confirmer"; setTimeout(() => { if (t.isConnected) { t.classList.remove("confirm"); t.textContent = "Supprimer"; } }, 4000); return; }
+    S.data.notes = S.data.notes.filter(n => n.id !== t.dataset.del); persist(); render(); toast("Réflexion supprimée"); return;
+  }
+  if (t.id === "micBtn") { rec ? stopDict() : startDict(); return; }
+  switch (a) {
+    case "close": closeSheet(); break;
+    case "add": lastFocus = t; openSheet("add"); break;
+    case "scan": lastFocus = t; openSheet("scan"); break;
+    case "backup": lastFocus = t; openSheet("backup"); break;
+    case "manual": openSheet("form", { title: $("#a-q")?.value.trim() || "" }); break;
+    case "searchAdd": doSearch($("#a-q").value, "pickadd"); break;
+    case "searchEdition": doSearch($("#ed-q").value, "pickedition"); break;
+    case "findEdition": openSheet("edition", S.sheet.arg); break;
+    case "isbnGo": { const v = $("#s-isbn").value; stopScan().then(() => handleIsbn(v)); break; }
+    case "saveNote": {
+      const ta = $("#noteTxt"), text = ta.value.trim(); if (!text) { ta.focus(); toast("Écris ou dicte d'abord ta réflexion."); break; }
+      stopDict(); S.data.notes.push({ id: "n" + Date.now().toString(36), bookId: S.sheet.arg, text, at: Date.now() }); ta.value = ""; persist(); render(); toast("Réflexion enregistrée"); break;
+    }
+    case "saveNew": {
+      const g = id => $(id).value.trim(), sv = id => $(id + " [aria-pressed=true]").dataset.v;
+      const title = g("#f-title"); if (!title) { $("#f-title").focus(); toast("Donne au moins un titre."); break; }
+      const track = sv("#f-track"), id = slug(title) + "-" + Date.now().toString(36);
+      S.data.books.push({ id, title, author: g("#f-author"), desc: g("#f-desc"), track, tracks: [track], tier: sv("#f-tier"), cycle: parseInt(g("#f-cycle")) || null,
+        status: sv("#f-status"), own: sv("#f-own"), audible: "", audibleUrl: "", isbn: isbnClean(g("#f-isbn")), pages: parseInt(g("#f-pages")) || null, cover: g("#f-cover"),
+        order: Math.max(0, ...S.data.books.map(b => b.order || 0)) + 1, updatedAt: Date.now() });
+      persist(); render(); toast("Ajouté à la bibliothèque"); openSheet("book", id); break;
+    }
+    case "delBook": {
+      if (!t.classList.contains("confirm")) { t.classList.add("confirm"); t.textContent = "Toucher encore pour retirer définitivement"; break; }
+      const id = S.sheet.arg; S.data.books = S.data.books.filter(b => b.id !== id); S.data.notes = S.data.notes.filter(n => n.bookId !== id);
+      persist(); closeSheet(); render(); toast("Livre retiré"); break;
+    }
+    case "export": exportData(); break;
+    case "import": $("#importFile").click(); break;
+    case "importYes": if (pendingImport) { S.data = { v: 1, books: pendingImport.books, rotations: pendingImport.rotations, notes: pendingImport.notes }; pendingImport = null; persist(); closeSheet(); render(); toast("Sauvegarde restaurée"); } break;
+    case "importNo": pendingImport = null; $("#importConfirm").innerHTML = ""; break;
+  }
+});
+document.addEventListener("input", e => { if (e.target.id === "q") { S.q = e.target.value; render(); } });
+document.addEventListener("change", e => {
+  if (S.sheet?.kind !== "book") return;
+  const id = S.sheet.arg, v = e.target.value.trim();
+  const map = { "e-title": () => v && { title: v }, "e-author": () => ({ author: v }), "e-cycle": () => ({ cycle: parseInt(v) || null }),
+    "e-isbn": () => ({ isbn: isbnClean(v), ...(isbnValid(v) && !bk(id).cover ? { cover: `https://covers.openlibrary.org/b/isbn/${isbnClean(v)}-M.jpg?default=false` } : {}) }),
+    "e-pages": () => ({ pages: parseInt(v) || null }) };
+  const f = map[e.target.id]; if (f) { const d = f(); if (d) patchBook(id, d); }
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && S.sheet) closeSheet();
+  if (e.key === "Enter") {
+    if (e.target.id === "a-q") { e.preventDefault(); doSearch(e.target.value, "pickadd"); }
+    if (e.target.id === "ed-q") { e.preventDefault(); doSearch(e.target.value, "pickedition"); }
+    if (e.target.id === "s-isbn") { e.preventDefault(); const v = e.target.value; stopScan().then(() => handleIsbn(v)); }
+  }
+});
+addEventListener("hashchange", () => { const h = location.hash.slice(1); if (VIEWS.includes(h)) { S.view = h; render(); } });
+document.addEventListener("visibilitychange", () => { if (document.hidden) { stopDict(); if (S.sheet?.kind === "scan") closeSheet(); } });
+
+/* ================= Démarrage ================= */
+(async () => {
+  const h = location.hash.slice(1); if (VIEWS.includes(h)) S.view = h;
+  S.data = load();
+  if (!S.data) {
+    try { const d = await (await fetch("seed.json", { cache: "no-cache" })).json(); S.data = { v: 1, books: d.books, rotations: d.rotations, notes: d.notes }; persist(false); }
+    catch { S.data = { v: 1, books: [], rotations: [], notes: [] }; }
+    try { await navigator.storage?.persist?.(); } catch {}
+  }
+  render();
+  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,2 @@
+Sauvegardes de l'appli Codex (fichier codex.json).
+Cette branche n'est pas publiée par Netlify.

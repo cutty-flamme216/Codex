@@ -1,5 +1,5 @@
 // Codex — service worker : l'appli fonctionne hors ligne, les recherches restent en ligne.
-const SHELL = "codex-shell-v7";
+const SHELL = "codex-shell-v8";
 const RUNTIME = "codex-runtime-v1";
 const FILES = ["./", "index.html", "manifest.webmanifest", "seed.json", "vendor/html5-qrcode.min.js",
   "fonts/newsreader-latin-opsz-normal.woff2", "fonts/newsreader-latin-opsz-italic.woff2", "fonts/hanken-grotesk-latin-wght-normal.woff2",

@@ -255,6 +255,7 @@ textarea.in{resize:vertical;line-height:1.5}
 
 <div id="sheetRoot"></div>
 <input type="file" id="importFile" accept="application/json,.json" hidden>
+<input type="file" id="photoFile" accept="image/*" capture="environment" hidden>
 
 <script>
 "use strict";
@@ -265,7 +266,7 @@ const TIERS = { god: "God", a: "Tiers A", b: "Tiers B" };
 const STATUS = { "a-lire": "À lire", "en-cours": "En cours", "lu": "Lu" };
 const OWN = { papier: "Papier", audible: "Audible", non: "À acheter" };
 const VIEWS = ["lecture", "bibliotheque", "carnet"];
-const VERSION = "1.6";
+const VERSION = "1.7";
 
 const S = { data: null, meta: { lastExport: 0, changedAt: 0 }, view: "lecture", q: "", track: "all", status: "all", sheet: null };
 
@@ -303,7 +304,8 @@ function isbnValid(s) {
 }
 function shortAuthor(a) { return (a || "").split(",")[0].trim(); }
 function cloth(b, size, extra = "") {
-  const img = b.cover ? `<span class="img"><img src="${esc(b.cover)}" alt="" loading="lazy" onerror="this.parentNode.remove()"></span>` : "";
+  const src = b.photo || b.cover;
+  const img = src ? `<span class="img"><img src="${esc(src)}" alt="" loading="lazy" onerror="this.parentNode.remove()"></span>` : "";
   return `<span class="cloth ${size}${b.tier === "god" ? " god" : ""}" data-t="${b.track}" aria-hidden="true">${extra}
     <span class="ct">${esc(b.title)}</span><span class="ca">${esc(shortAuthor(b.author))}</span>${img}</span>`;
 }
@@ -480,7 +482,7 @@ function sheetBook(b) {
   const notes = S.data.notes.filter(n => n.bookId === b.id).sort((x, y) => y.at - x.at);
   const meta = [TRACKS[b.track], b.tier === "god" ? `<span class="g">palier God</span>` : TIERS[b.tier], b.cycle ? "cycle " + roman(b.cycle) : ""].filter(Boolean).join(", ");
   return closeBtn + `<div class="hero">${cloth(b, "xl", b.status === "en-cours" ? `<span class="ribbon"></span>` : "")}
-    <h2 id="sheetTitle">${esc(b.title)}</h2><div class="by">${esc(b.author) || "Auteur à compléter"}</div><div class="meta">${meta}</div></div>
+    <h2 id="sheetTitle">${esc(b.title)}</h2><div class="by">${esc(b.author) || "Auteur à compléter"}</div><div class="meta">${meta}</div>${b.edition ? `<div class="by" style="font-size:15px;margin-top:8px">${esc(b.edition)}</div>` : ""}</div>
   ${b.desc ? `<p class="desc">${esc(b.desc)}</p>` : ""}
   <div class="lbl">Où j'en suis</div>${segSet("status", STATUS, b.status)}
   <div class="lbl">Je l'ai en</div>${segSet("own", OWN, b.own)}
@@ -493,7 +495,12 @@ function sheetBook(b) {
   <div class="lbl">Détails</div>
   <div class="row"><span class="k">Audible</span><span class="v">${b.audibleUrl ? `<a href="${esc(b.audibleUrl)}" target="_blank" rel="noopener">${esc(b.audible || "Ouvrir")} ↗</a>` : esc(b.audible || "Pas vérifié")}</span></div>
   <div class="row"><span class="k">Édition</span><span class="v">${b.isbn ? `${esc(b.isbn)}${b.pages ? `, ${b.pages} pages` : ""}` : "Aucune"} <button class="act" type="button" data-action="findEdition" style="margin-left:8px">${b.isbn ? "Changer" : "Trouver"}</button></span></div>
-  ${b.cover ? `<div class="row"><span class="k">Couverture</span><span class="v"><button class="act" type="button" data-action="removeCover">Revenir à la toile</button></span></div>` : ""}
+  ${b.cover && !b.photo ? `<div class="row"><span class="k">Couverture</span><span class="v"><button class="act" type="button" data-action="removeCover">Revenir à la toile</button></span></div>` : ""}
+  <div class="lbl">Mon exemplaire</div>
+  <div class="stack" style="margin-top:0"><button class="btn" type="button" data-action="photo"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>${b.photo ? "Reprendre la photo" : "Photographier mon exemplaire"}</button>
+  ${b.photo ? `<button class="btn ghost" type="button" data-action="removePhoto">Retirer la photo</button>` : ""}</div>
+  <div class="fields" style="margin-top:12px"><label class="full"><span>Description de l'édition</span><textarea class="in" id="e-edition" rows="2" placeholder="Reliure cuir rouge, Garnier, 1925">${esc(b.edition || "")}</textarea></label></div>
+  <p class="hint">Pour une édition ancienne sans ISBN, laisse l'ISBN vide : la photo et la description suffisent.</p>
   <div class="lbl">Modifier la fiche</div>
   <div class="fields">
     <label class="full"><span>Titre</span><input class="in" id="e-title" value="${esc(b.title)}"></label>
@@ -721,6 +728,26 @@ function startDict() {
 }
 function stopDict() { if (rec) { try { rec.stop(); } catch {} } }
 
+/* ================= Photo de mon exemplaire ================= */
+async function photoToCover(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    const W = 360, H = 540, ratio = W / H;
+    let sw = img.naturalWidth, sh = img.naturalHeight, sx = 0, sy = 0;
+    if (sw / sh > ratio) { const nw = sh * ratio; sx = (sw - nw) / 2; sw = nw; } else { const nh = sw / ratio; sy = (sh - nh) / 2; sh = nh; }
+    const c = document.createElement("canvas"); c.width = W; c.height = H;
+    c.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, W, H);
+    return c.toDataURL("image/jpeg", 0.78);
+  } finally { URL.revokeObjectURL(url); }
+}
+$("#photoFile").addEventListener("change", async e => {
+  const f = e.target.files?.[0]; e.target.value = "";
+  if (!f || S.sheet?.kind !== "book") return;
+  try { const data = await photoToCover(f); patchBook(S.sheet.arg, { photo: data }); toast("Photo enregistrée"); }
+  catch { toast("Cette image n'a pas pu être lue. Réessaie."); }
+});
+
 /* ================= Sauvegarde GitHub ================= */
 const GH = (() => {
   const CFG = "codex.github.v1", FILE = "codex.json";
@@ -877,6 +904,8 @@ document.addEventListener("click", e => {
       toast("Édition remplacée"); openSheet("book", id); break; }
     case "edKeep": { const id = pendingEdition?.id; pendingEdition = null; toast("Édition actuelle gardée"); openSheet("book", id); break; }
     case "edOther": { const r = pendingEdition.r; pendingEdition = null; openSheet("form", r); break; }
+    case "photo": $("#photoFile").click(); break;
+    case "removePhoto": if (!t.classList.contains("confirm")) { t.classList.add("confirm"); t.textContent = "Touche encore pour retirer la photo"; break; } patchBook(S.sheet.arg, { photo: "" }); toast("Photo retirée"); break;
     case "findCovers": runCovers(); break;
     case "stopCovers": if (coverJob) coverJob.stop = true; break;
     case "removeCover": patchBook(S.sheet.arg, { cover: "", noCover: true }); toast("Couverture retirée"); break;
@@ -899,7 +928,7 @@ document.addEventListener("change", e => {
   const id = S.sheet.arg, v = e.target.value.trim();
   const map = { "e-title": () => v && { title: v }, "e-author": () => ({ author: v }), "e-cycle": () => ({ cycle: parseInt(v) || null }),
     "e-isbn": () => ({ isbn: isbnClean(v), ...(isbnValid(v) && !bk(id).cover ? { cover: `https://covers.openlibrary.org/b/isbn/${isbnClean(v)}-M.jpg?default=false` } : {}) }),
-    "e-pages": () => ({ pages: parseInt(v) || null }) };
+    "e-pages": () => ({ pages: parseInt(v) || null }), "e-edition": () => ({ edition: v }) };
   const f = map[e.target.id]; if (f) { const d = f(); if (d) patchBook(id, d); }
 });
 document.addEventListener("keydown", e => {

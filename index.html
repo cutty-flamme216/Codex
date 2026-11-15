@@ -74,6 +74,7 @@ img{max-width:100%}
 .cloth.xl{width:150px;height:225px;font-size:19px} .cloth.xl .ca{font-size:14px}
 .cloth.lg{width:128px;height:192px;font-size:16px} .cloth.lg .ca{font-size:12px}
 .cloth.md{width:100%;aspect-ratio:2/3;font-size:clamp(11px,3.1vw,15px)} .cloth.md .ca{font-size:.72em}
+.cloth.lg .ct,.cloth.xl .ct{hyphens:manual;-webkit-hyphens:manual}
 .cloth.sm{width:40px;height:60px;padding:0} .cloth.sm .ct,.cloth.sm .ca{display:none} .cloth.sm::before{inset:9% 9% 9% 18%}
 
 /* En ce moment */
@@ -264,7 +265,7 @@ const TIERS = { god: "God", a: "Tiers A", b: "Tiers B" };
 const STATUS = { "a-lire": "À lire", "en-cours": "En cours", "lu": "Lu" };
 const OWN = { papier: "Papier", audible: "Audible", non: "À acheter" };
 const VIEWS = ["lecture", "bibliotheque", "carnet"];
-const VERSION = "1.5";
+const VERSION = "1.6";
 
 const S = { data: null, meta: { lastExport: 0, changedAt: 0 }, view: "lecture", q: "", track: "all", status: "all", sheet: null };
 
@@ -548,6 +549,20 @@ function sheetEdition(b) {
   <div id="results" class="results"></div>`;
 }
 
+function sheetCompare(b) {
+  const r = pendingEdition?.r || {};
+  const ed = (x, label, cur) => `<div style="display:flex;flex-direction:column;align-items:center;gap:10px;min-width:0;text-align:center">
+    <span class="lbl" style="margin:0">${label}</span>${cloth(x, "lg")}
+    <span style="font-size:13px;color:var(--paper-2);line-height:1.4">${x.isbn ? "ISBN " + esc(x.isbn) : "Aucune édition liée"}${x.pages ? `<br>${x.pages} pages` : ""}${x.publisher ? `<br>${esc(x.publisher)}${x.year ? ", " + esc(x.year) : ""}` : ""}</span></div>`;
+  const nouveau = { title: r.title || b.title, author: r.author || b.author, track: b.track, tier: b.tier, cover: r.cover, isbn: r.isbn, pages: r.pages, publisher: r.publisher, year: r.year };
+  return closeBtn + `<h3 id="sheetTitle">Tu as déjà ce livre</h3><p class="sub">${esc(b.title)} est dans ta bibliothèque. Garder ton édition actuelle ou la remplacer par celle-ci ?</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px">${ed(b, "Actuelle")}${ed(nouveau, "Scannée")}</div>
+  <p class="hint" style="text-align:center">Ton statut, ta piste et tes réflexions restent les mêmes.</p>
+  <div class="stack" style="margin-top:18px"><button class="btn gold" type="button" data-action="edReplace">Remplacer par l'édition scannée</button>
+  <button class="btn" type="button" data-action="edKeep">Garder l'actuelle</button>
+  <button class="btn ghost" type="button" data-action="edOther">C'est un autre livre, l'ajouter</button></div>`;
+}
+
 function sheetBackup() {
   const gh = GH.cfg();
   const ghBlock = gh ? `
@@ -597,7 +612,7 @@ function openSheet(kind, arg) {
   stopScan(); stopDict();
   S.sheet = { kind, arg };
   const html = kind === "book" ? sheetBook(bk(arg)) : kind === "add" ? sheetAdd(arg) : kind === "form" ? sheetForm(arg) : kind === "scan" ? sheetScan()
-    : kind === "edition" ? sheetEdition(bk(arg)) : sheetBackup();
+    : kind === "edition" ? sheetEdition(bk(arg)) : kind === "compare" ? sheetCompare(bk(arg)) : sheetBackup();
   $("#sheetRoot").innerHTML = `<div class="scrim" data-scrim><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">${html}</div></div>`;
   document.body.style.overflow = "hidden";
   if (kind === "scan") startScan();
@@ -638,11 +653,20 @@ async function handleIsbn(isbn) {
   if (dup) { toast("Déjà dans ta bibliothèque"); openSheet("book", dup.id); return; }
   const hint = $("#scanHint"); if (hint) hint.innerHTML = `<span class="spin"></span>Recherche de ${isbn}…`;
   let r = null; try { r = navigator.onLine ? await lookupIsbn(isbn) : null; } catch {}
-  if (r) {
-    const twin = S.data.books.find(b => !b.isbn && slug(b.title) === slug(r.title));
-    if (twin) { patchBook(twin.id, { isbn, pages: r.pages || twin.pages, cover: r.cover || twin.cover }); toast("Édition liée à ton livre"); openSheet("book", twin.id); return; }
-  } else toast("ISBN introuvable en ligne : complète à la main.");
-  openSheet("form", r || { isbn });
+  if (!r) toast("ISBN introuvable en ligne : complète à la main.");
+  offerEdition(r || { isbn });
+}
+const coreTitle = t => norm((t || "").replace(/\(.*?\)/g, " ").split(/[:.]/)[0]).replace(/\b(le|la|les|l|un|une)\b/g, " ").replace(/\s+/g, " ").trim();
+function findTwin(r) {
+  const c = coreTitle(r.title); if (c.length < 3) return null;
+  return S.data.books.find(b => { const bc = coreTitle(b.title); return bc && (bc === c || (bc.length > 5 && c.startsWith(bc)) || (c.length > 5 && bc.startsWith(c))); }) || null;
+}
+let pendingEdition = null;
+function offerEdition(r) {
+  const twin = r.title ? findTwin(r) : null;
+  if (!twin) { openSheet("form", r); return; }
+  pendingEdition = { r, id: twin.id };
+  openSheet("compare", twin.id);
 }
 
 /* ================= Scanner ================= */
@@ -812,7 +836,7 @@ document.addEventListener("click", e => {
   if (t.dataset.status) { S.status = t.dataset.status; render(); return; }
   if (t.dataset.set) { patchBook(S.sheet.arg, { [t.dataset.set]: t.dataset.val, ...(t.dataset.set === "track" ? { tracks: [t.dataset.val] } : {}) }); return; }
   if (t.dataset.v && t.parentElement.classList.contains("seg")) { t.parentElement.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === t)); return; }
-  if (t.hasAttribute("data-pickadd")) { const r = lastResults[+t.dataset.pickadd]; const dup = r.isbn && S.data.books.find(b => isbnClean(b.isbn) === isbnClean(r.isbn)); if (dup) { toast("Déjà dans ta bibliothèque"); openSheet("book", dup.id); } else openSheet("form", r); return; }
+  if (t.hasAttribute("data-pickadd")) { const r = lastResults[+t.dataset.pickadd]; const dup = r.isbn && S.data.books.find(b => isbnClean(b.isbn) === isbnClean(r.isbn)); if (dup) { toast("Déjà dans ta bibliothèque, même édition"); openSheet("book", dup.id); } else offerEdition(r); return; }
   if (t.hasAttribute("data-pickedition")) { const r = lastResults[+t.dataset.pickedition], id = S.sheet.arg; const b = bk(id);
     patchBook(id, { isbn: r.isbn || b.isbn, pages: r.pages || b.pages, cover: r.cover || b.cover, noCover: false, author: b.author || r.author, desc: b.desc || r.desc }); toast("Édition liée"); openSheet("book", id); return; }
   if (t.dataset.del) {
@@ -848,6 +872,11 @@ document.addEventListener("click", e => {
       const id = S.sheet.arg; S.data.books = S.data.books.filter(b => b.id !== id); S.data.notes = S.data.notes.filter(n => n.bookId !== id);
       persist(); closeSheet(); render(); toast("Livre retiré"); break;
     }
+    case "edReplace": { const { r, id } = pendingEdition; const b = bk(id); pendingEdition = null;
+      patchBook(id, { isbn: r.isbn || b.isbn, pages: r.pages || b.pages, cover: r.cover || b.cover, noCover: false, author: b.author || r.author, desc: b.desc || r.desc });
+      toast("Édition remplacée"); openSheet("book", id); break; }
+    case "edKeep": { const id = pendingEdition?.id; pendingEdition = null; toast("Édition actuelle gardée"); openSheet("book", id); break; }
+    case "edOther": { const r = pendingEdition.r; pendingEdition = null; openSheet("form", r); break; }
     case "findCovers": runCovers(); break;
     case "stopCovers": if (coverJob) coverJob.stop = true; break;
     case "removeCover": patchBook(S.sheet.arg, { cover: "", noCover: true }); toast("Couverture retirée"); break;

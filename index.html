@@ -264,7 +264,7 @@ const TIERS = { god: "God", a: "Tiers A", b: "Tiers B" };
 const STATUS = { "a-lire": "À lire", "en-cours": "En cours", "lu": "Lu" };
 const OWN = { papier: "Papier", audible: "Audible", non: "À acheter" };
 const VIEWS = ["lecture", "bibliotheque", "carnet"];
-const VERSION = "1.3";
+const VERSION = "1.4";
 
 const S = { data: null, meta: { lastExport: 0, changedAt: 0 }, view: "lecture", q: "", track: "all", status: "all", sheet: null };
 
@@ -353,36 +353,48 @@ async function searchBooks(q) {
 
 /* ================= Couvertures automatiques ================= */
 const norm = s => slug(s || "").replace(/-/g, " ");
+let gbBlocked = false;
 async function findCover(b) {
   const t = norm(b.title).replace(/\b(le|la|les|l|de|des|du|d|un|une)\b/g, " ").replace(/\s+/g, " ").trim();
-  const q = `intitle:${b.title.replace(/[()]/g, " ")}${b.author ? " inauthor:" + shortAuthor(b.author).split(" ").pop() : ""}`;
-  const pick = list => {
-    const ok = list.filter(r => r.cover);
-    return ok.find(r => { const rt = norm(r.title); return t && (rt.includes(t.split(" ")[0]) || t.includes(rt.split(" ")[0])); }) || null;
-  };
+  const key = t.split(" ")[0] || "";
+  const fits = title => { const rt = norm(title); return !key || rt.includes(key); };
+  const au = shortAuthor(b.author).split(" ").pop() || "";
+  let answered = false;
+  // 1. Open Library : fiable et sans quota
   try {
-    const gb = await getJSON(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&printType=books&maxResults=10&langRestrict=fr`);
-    let r = pick((gb.items || []).map(fromGB));
-    if (r) return r.cover;
-    const ol = await getJSON(`https://openlibrary.org/search.json?q=${encodeURIComponent(b.title + " " + shortAuthor(b.author))}&limit=5&fields=title,cover_i`);
-    r = (ol.docs || []).find(d => d.cover_i);
-    return r ? `https://covers.openlibrary.org/b/id/${r.cover_i}-M.jpg` : "";
-  } catch { return null; }
+    const ol = await getJSON(`https://openlibrary.org/search.json?title=${encodeURIComponent(b.title)}${au ? "&author=" + encodeURIComponent(au) : ""}&limit=8&fields=title,cover_i`);
+    answered = true;
+    let d = (ol.docs || []).find(x => x.cover_i && fits(x.title));
+    if (!d) { const ol2 = await getJSON(`https://openlibrary.org/search.json?q=${encodeURIComponent(b.title)}&limit=8&fields=title,cover_i`); d = (ol2.docs || []).find(x => x.cover_i && fits(x.title)); }
+    if (d) return `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg`;
+  } catch {}
+  // 2. Google Books, tant qu'il ne bloque pas
+  if (!gbBlocked) try {
+    const q = `intitle:${b.title.replace(/[()]/g, " ")}${au ? " inauthor:" + au : ""}`;
+    const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&printType=books&maxResults=10`);
+    if (r.status === 429 || r.status === 403) gbBlocked = true;
+    else if (r.ok) { answered = true; const g = (await r.json()).items || []; const hit = g.map(fromGB).find(x => x.cover && fits(x.title)); if (hit) return hit.cover; }
+  } catch {}
+  return answered ? "" : null;
 }
 let coverJob = null;
 async function runCovers() {
   if (coverJob) return;
   if (!navigator.onLine) { toast("Pas de connexion pour l'instant."); return; }
+  gbBlocked = false;
   const todo = S.data.books.filter(b => !b.cover && !b.noCover);
-  coverJob = { total: todo.length, done: 0, found: 0, stop: false }; render();
+  coverJob = { total: todo.length, done: 0, found: 0, failed: 0, stop: false }; render();
   for (const b of todo) {
     if (coverJob.stop) break;
     const c = await findCover(b);
-    if (c) { b.cover = c; coverJob.found++; } else if (c === "") b.noCover = true;
+    if (c) { b.cover = c; coverJob.found++; } else if (c === "") b.noCover = true; else coverJob.failed++;
     coverJob.done++; persist(); render();
-    await new Promise(r => setTimeout(r, 250));
+    await new Promise(r => setTimeout(r, 350));
   }
-  const f = coverJob.found; coverJob = null; render(); toast(`${plural(f, "couverture")} ajoutée${f > 1 ? "s" : ""}`);
+  const { found, failed, done } = coverJob; coverJob = null; render();
+  if (found) toast(`${plural(found, "couverture")} ajoutée${found > 1 ? "s" : ""}`);
+  else if (failed === done) toast("Les bases de livres n'ont pas répondu. Réessaie dans quelques minutes.");
+  else toast("Aucune couverture trouvée pour ces livres.");
 }
 
 /* ================= Vues ================= */
@@ -778,6 +790,7 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) { sto
     catch { S.data = { v: 1, books: [], rotations: [], notes: [] }; }
     try { await navigator.storage?.persist?.(); } catch {}
   }
+  if (S.meta.coverFix !== 1) { S.data.books.forEach(b => { delete b.noCover; }); S.meta.coverFix = 1; persist(false); }
   render();
   if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 })();

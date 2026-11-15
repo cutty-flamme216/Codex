@@ -264,7 +264,7 @@ const TIERS = { god: "God", a: "Tiers A", b: "Tiers B" };
 const STATUS = { "a-lire": "À lire", "en-cours": "En cours", "lu": "Lu" };
 const OWN = { papier: "Papier", audible: "Audible", non: "À acheter" };
 const VIEWS = ["lecture", "bibliotheque", "carnet"];
-const VERSION = "1.2";
+const VERSION = "1.3";
 
 const S = { data: null, meta: { lastExport: 0, changedAt: 0 }, view: "lecture", q: "", track: "all", status: "all", sheet: null };
 
@@ -351,6 +351,40 @@ async function searchBooks(q) {
   return out.filter(r => r.title && !seen.has((r.isbn || r.title + r.author)) && seen.add(r.isbn || r.title + r.author)).slice(0, 12);
 }
 
+/* ================= Couvertures automatiques ================= */
+const norm = s => slug(s || "").replace(/-/g, " ");
+async function findCover(b) {
+  const t = norm(b.title).replace(/\b(le|la|les|l|de|des|du|d|un|une)\b/g, " ").replace(/\s+/g, " ").trim();
+  const q = `intitle:${b.title.replace(/[()]/g, " ")}${b.author ? " inauthor:" + shortAuthor(b.author).split(" ").pop() : ""}`;
+  const pick = list => {
+    const ok = list.filter(r => r.cover);
+    return ok.find(r => { const rt = norm(r.title); return t && (rt.includes(t.split(" ")[0]) || t.includes(rt.split(" ")[0])); }) || null;
+  };
+  try {
+    const gb = await getJSON(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&printType=books&maxResults=10&langRestrict=fr`);
+    let r = pick((gb.items || []).map(fromGB));
+    if (r) return r.cover;
+    const ol = await getJSON(`https://openlibrary.org/search.json?q=${encodeURIComponent(b.title + " " + shortAuthor(b.author))}&limit=5&fields=title,cover_i`);
+    r = (ol.docs || []).find(d => d.cover_i);
+    return r ? `https://covers.openlibrary.org/b/id/${r.cover_i}-M.jpg` : "";
+  } catch { return null; }
+}
+let coverJob = null;
+async function runCovers() {
+  if (coverJob) return;
+  if (!navigator.onLine) { toast("Pas de connexion pour l'instant."); return; }
+  const todo = S.data.books.filter(b => !b.cover && !b.noCover);
+  coverJob = { total: todo.length, done: 0, found: 0, stop: false }; render();
+  for (const b of todo) {
+    if (coverJob.stop) break;
+    const c = await findCover(b);
+    if (c) { b.cover = c; coverJob.found++; } else if (c === "") b.noCover = true;
+    coverJob.done++; persist(); render();
+    await new Promise(r => setTimeout(r, 250));
+  }
+  const f = coverJob.found; coverJob = null; render(); toast(`${plural(f, "couverture")} ajoutée${f > 1 ? "s" : ""}`);
+}
+
 /* ================= Vues ================= */
 function nextFor(t) { for (const r of S.data.rotations) { const b = bk(r[t]); if (b && b.status === "a-lire") return { b, r }; } return null; }
 function curRot() { const r = S.data.rotations.find(r => ["pilier","sage","plaisir"].some(t => bk(r[t])?.status !== "lu")); return r ? r.n : null; }
@@ -404,6 +438,9 @@ function viewBiblio() {
     <div class="tabs">${tab("track","all","Tout")}${tab("track","pilier","Pilier",cnt(b=>b.track==="pilier"))}${tab("track","sage","Sage",cnt(b=>b.track==="sage"))}${tab("track","plaisir","Plaisir",cnt(b=>b.track==="plaisir"))}</div>
     <div class="tabs sub">${tab("status","all","Tous")}${tab("status","en-cours","En cours",cnt(b=>b.status==="en-cours"))}${tab("status","a-lire","À lire",cnt(b=>b.status==="a-lire"))}${tab("status","lu","Lus",cnt(b=>b.status==="lu"))}${tab("status","non","À acheter",cnt(b=>b.own==="non"))}</div>
     <p class="count">${plural(list.length, "livre")}</p>`;
+  const missing = all.filter(b => !b.cover && !b.noCover).length;
+  if (coverJob) h += `<div class="nudge"><span><span class="spin"></span>Couvertures : ${coverJob.done} sur ${coverJob.total}, ${coverJob.found} trouvées</span><button type="button" data-action="stopCovers">Arrêter</button></div>`;
+  else if (missing) h += `<div class="nudge"><span>${plural(missing, "livre")} sans couverture.</span><button type="button" data-action="findCovers">Chercher les couvertures</button></div>`;
   h += list.length ? `<div class="grid">${list.map(b => `<button class="gb${b.status === "lu" ? " done" : ""}${b.own === "non" ? " unowned" : ""}" type="button" data-open="${b.id}">
       ${cloth(b, "md", b.status === "en-cours" ? `<span class="ribbon"></span>` : "")}<span class="t">${esc(b.title)}</span>
       <span class="s">${b.status === "lu" ? "Lu" : b.status === "en-cours" ? "En cours" : b.own === "non" ? "À acheter" : b.cycle ? "Cycle " + roman(b.cycle) : "À lire"}</span></button>`).join("")}</div>`
@@ -442,6 +479,7 @@ function sheetBook(b) {
   <div class="lbl">Détails</div>
   <div class="row"><span class="k">Audible</span><span class="v">${b.audibleUrl ? `<a href="${esc(b.audibleUrl)}" target="_blank" rel="noopener">${esc(b.audible || "Ouvrir")} ↗</a>` : esc(b.audible || "Pas vérifié")}</span></div>
   <div class="row"><span class="k">Édition</span><span class="v">${b.isbn ? `${esc(b.isbn)}${b.pages ? `, ${b.pages} pages` : ""}` : "Aucune"} <button class="act" type="button" data-action="findEdition" style="margin-left:8px">${b.isbn ? "Changer" : "Trouver"}</button></span></div>
+  ${b.cover ? `<div class="row"><span class="k">Couverture</span><span class="v"><button class="act" type="button" data-action="removeCover">Revenir à la toile</button></span></div>` : ""}
   <div class="lbl">Modifier la fiche</div>
   <div class="fields">
     <label class="full"><span>Titre</span><input class="in" id="e-title" value="${esc(b.title)}"></label>
@@ -668,7 +706,7 @@ document.addEventListener("click", e => {
   if (t.dataset.v && t.parentElement.classList.contains("seg")) { t.parentElement.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === t)); return; }
   if (t.hasAttribute("data-pickadd")) { const r = lastResults[+t.dataset.pickadd]; const dup = r.isbn && S.data.books.find(b => isbnClean(b.isbn) === isbnClean(r.isbn)); if (dup) { toast("Déjà dans ta bibliothèque"); openSheet("book", dup.id); } else openSheet("form", r); return; }
   if (t.hasAttribute("data-pickedition")) { const r = lastResults[+t.dataset.pickedition], id = S.sheet.arg; const b = bk(id);
-    patchBook(id, { isbn: r.isbn || b.isbn, pages: r.pages || b.pages, cover: r.cover || b.cover, author: b.author || r.author, desc: b.desc || r.desc }); toast("Édition liée"); openSheet("book", id); return; }
+    patchBook(id, { isbn: r.isbn || b.isbn, pages: r.pages || b.pages, cover: r.cover || b.cover, noCover: false, author: b.author || r.author, desc: b.desc || r.desc }); toast("Édition liée"); openSheet("book", id); return; }
   if (t.dataset.del) {
     if (!t.classList.contains("confirm")) { t.classList.add("confirm"); t.textContent = "Confirmer"; setTimeout(() => { if (t.isConnected) { t.classList.remove("confirm"); t.textContent = "Supprimer"; } }, 4000); return; }
     S.data.notes = S.data.notes.filter(n => n.id !== t.dataset.del); persist(); render(); toast("Réflexion supprimée"); return;
@@ -702,6 +740,9 @@ document.addEventListener("click", e => {
       const id = S.sheet.arg; S.data.books = S.data.books.filter(b => b.id !== id); S.data.notes = S.data.notes.filter(n => n.bookId !== id);
       persist(); closeSheet(); render(); toast("Livre retiré"); break;
     }
+    case "findCovers": runCovers(); break;
+    case "stopCovers": if (coverJob) coverJob.stop = true; break;
+    case "removeCover": patchBook(S.sheet.arg, { cover: "", noCover: true }); toast("Couverture retirée"); break;
     case "export": exportData(); break;
     case "import": $("#importFile").click(); break;
     case "importYes": if (pendingImport) { S.data = { v: 1, books: pendingImport.books, rotations: pendingImport.rotations, notes: pendingImport.notes }; pendingImport = null; persist(); closeSheet(); render(); toast("Sauvegarde restaurée"); } break;

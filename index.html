@@ -266,7 +266,7 @@ const TIERS = { god: "God", a: "Tiers A", b: "Tiers B" };
 const STATUS = { "a-lire": "À lire", "en-cours": "En cours", "lu": "Lu" };
 const OWN = { papier: "Papier", audible: "Audible", non: "À acheter" };
 const VIEWS = ["lecture", "bibliotheque", "carnet"];
-const VERSION = "1.8";
+const VERSION = "1.9";
 
 const S = { data: null, meta: { lastExport: 0, changedAt: 0 }, view: "lecture", q: "", track: "all", status: "all", sheet: null };
 
@@ -597,7 +597,7 @@ function sheetCompare(b) {
 function sheetBackup() {
   const gh = GH.cfg();
   const ghBlock = gh ? `
-  <div class="row"><span class="k">Dépôt</span><span class="v">${esc(gh.repo)}</span></div>
+  <div class="row"><span class="k">Dépôt</span><span class="v">${esc(gh.repo)}${gh.branch ? `, branche ${esc(gh.branch)}` : ""}</span></div>
   <div class="row"><span class="k">Dernier envoi</span><span class="v" id="ghState">${GH.state()}</span></div>
   <div class="row"><span class="k">Envoi automatique</span><span class="v"><button class="act" type="button" data-action="ghAuto">${gh.auto ? "Activé" : "Désactivé"}</button></span></div>
   <div class="stack" style="margin-top:16px"><button class="btn gold" type="button" data-action="ghPush">Envoyer sur GitHub maintenant</button>
@@ -606,7 +606,8 @@ function sheetBackup() {
   <button class="btn ghost" type="button" data-action="ghForget">Déconnecter GitHub de ce téléphone</button></div>`
   : `<p class="hint" style="color:var(--paper-2)">Envoie tes données dans un dépôt GitHub privé : elles se sauvegardent toutes seules et tu les retrouves sur n'importe quel appareil.</p>
   <div class="fields" style="margin-top:12px">
-    <label class="full"><span>Dépôt privé</span><input class="in" id="gh-repo" value="cutty-flamme216/codex-data" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+    <label class="full"><span>Dépôt privé</span><input class="in" id="gh-repo" value="cutty-flamme216/Codex" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+    <label class="full"><span>Branche</span><input class="in" id="gh-branch" value="sauvegarde" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
     <label class="full"><span>Jeton d'accès GitHub</span><input class="in" id="gh-token" type="password" placeholder="github_pat_…" autocapitalize="off" autocorrect="off" spellcheck="false"></label></div>
   <div class="stack"><button class="btn gold" type="button" data-action="ghConnect">Connecter</button></div>
   <p class="hint" id="ghMsg">Le jeton reste sur ce téléphone. Il ne doit avoir accès qu'à ce dépôt.</p>`;
@@ -781,7 +782,7 @@ const GH = (() => {
   let timer = null, busy = false, again = false;
   const cfg = () => { try { return JSON.parse(localStorage.getItem(CFG) || "null"); } catch { return null; } };
   const save = c => { try { c ? localStorage.setItem(CFG, JSON.stringify(c)) : localStorage.removeItem(CFG); } catch {} };
-  const api = (c, method = "GET", body) => fetch(`https://api.github.com/repos/${c.repo}/contents/${FILE}`, {
+  const api = (c, method = "GET", body) => fetch(`https://api.github.com/repos/${c.repo}/contents/${FILE}${c.branch && method === "GET" ? "?ref=" + encodeURIComponent(c.branch) : ""}`, {
     method, keepalive: method === "PUT" && document.hidden,
     headers: { Authorization: `Bearer ${c.token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", ...(body ? { "Content-Type": "application/json" } : {}) },
     body: body ? JSON.stringify(body) : undefined, cache: "no-store" });
@@ -804,7 +805,7 @@ const GH = (() => {
     if (!navigator.onLine) { if (manual) toast("Pas de connexion : l'envoi se fera plus tard."); return; }
     busy = true; paint();
     const payload = { app: "codex", v: 1, exportedAt: new Date().toISOString(), books: S.data.books, rotations: S.data.rotations, notes: S.data.notes };
-    const body = sha => ({ message: `Sauvegarde du ${new Date().toLocaleString("fr-BE")}`, content: enc(JSON.stringify(payload, null, 1)), ...(sha ? { sha } : {}) });
+    const body = sha => ({ message: `Sauvegarde du ${new Date().toLocaleString("fr-BE")}`, content: enc(JSON.stringify(payload, null, 1)), ...(c.branch ? { branch: c.branch } : {}), ...(sha ? { sha } : {}) });
     try {
       let r = await api(c, "PUT", body(c.sha));
       if (r.status === 409 || r.status === 422) { c.sha = await getSha(c); r = await api(c, "PUT", body(c.sha)); }
@@ -825,7 +826,9 @@ const GH = (() => {
       if (!rr.ok) { msg.textContent = why(rr.status); return; }
       const info = await rr.json();
       if (!info.private) { msg.textContent = "Ce dépôt est public : tes réflexions seraient visibles par tous. Passe-le en privé d'abord."; return; }
-      const c = { repo, token, auto: true, sha: null, lastPush: 0, error: "" };
+      const branch = $("#gh-branch").value.trim();
+      if (branch) { const br = await fetch(`https://api.github.com/repos/${repo}/branches/${encodeURIComponent(branch)}`, { headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" } }); if (!br.ok) { msg.textContent = `La branche « ${branch} » n'existe pas dans ce dépôt.`; return; } }
+      const c = { repo, branch, token, auto: true, sha: null, lastPush: 0, error: "" };
       c.sha = await getSha(c);
       save(c);
       if (c.sha) { openSheet("backup"); toast("Connecté. Une sauvegarde existe déjà sur GitHub."); askPull(); }

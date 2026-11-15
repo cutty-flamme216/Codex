@@ -71,8 +71,8 @@ img{max-width:100%}
 .cloth .ca{position:relative;max-width:100%;font-family:var(--serif);font-style:italic;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cloth .img{position:absolute;inset:0;z-index:2}
 .cloth .img img{width:100%;height:100%;object-fit:cover;display:block}
-.cloth.xl{width:150px;height:225px;font-size:19px} .cloth.xl .ca{font-size:14px}
-.cloth.lg{width:128px;height:192px;font-size:16px} .cloth.lg .ca{font-size:12px}
+.cloth.xl{width:150px;height:225px;font-size:19px;padding:44px 22px 30px 32px} .cloth.xl .ca{font-size:14px}
+.cloth.lg{width:128px;height:192px;font-size:16px;padding:38px 19px 26px 27px} .cloth.lg .ca{font-size:12px}
 .cloth.md{width:100%;aspect-ratio:2/3;font-size:clamp(11px,3.1vw,15px)} .cloth.md .ca{font-size:.72em}
 .cloth.lg .ct,.cloth.xl .ct{hyphens:manual;-webkit-hyphens:manual}
 .cloth.sm{width:40px;height:60px;padding:0} .cloth.sm .ct,.cloth.sm .ca{display:none} .cloth.sm::before{inset:9% 9% 9% 18%}
@@ -266,7 +266,7 @@ const TIERS = { god: "God", a: "Tiers A", b: "Tiers B" };
 const STATUS = { "a-lire": "À lire", "en-cours": "En cours", "lu": "Lu" };
 const OWN = { papier: "Papier", audible: "Audible", non: "À acheter" };
 const VIEWS = ["lecture", "bibliotheque", "carnet"];
-const VERSION = "1.7";
+const VERSION = "1.8";
 
 const S = { data: null, meta: { lastExport: 0, changedAt: 0 }, view: "lecture", q: "", track: "all", status: "all", sheet: null };
 
@@ -324,24 +324,47 @@ function fromGB(item) {
   return { title: v.title + (v.subtitle && v.subtitle.length < 40 ? " : " + v.subtitle : ""), author: (v.authors || []).join(", "), pages: v.pageCount || null,
     desc: (v.description || "").replace(/<[^>]+>/g, "").slice(0, 260), isbn, cover: https(v.imageLinks?.thumbnail || v.imageLinks?.smallThumbnail), publisher: v.publisher || "", year: (v.publishedDate || "").slice(0, 4) };
 }
+const gbKey = () => { try { return localStorage.getItem("codex.gbkey") || ""; } catch { return ""; } };
+const gbUrl = q => `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}${gbKey() ? "&key=" + encodeURIComponent(gbKey()) : ""}`;
+const why = e => { const m = String(e?.message || e || ""); return /^\d+$/.test(m) ? (m === "429" || m === "403" ? "limite atteinte" : `erreur ${m}`) : e?.name === "AbortError" ? "trop lent" : "injoignable"; };
+async function fromBnF(isbn) {
+  const url = `https://catalogue.bnf.fr/api/SRU?version=1.2&operation=searchRetrieve&recordSchema=dublincore&maximumRecords=1&query=${encodeURIComponent(`bib.isbn adj "${isbn}"`)}`;
+  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 9000);
+  try {
+    const r = await fetch(url, { signal: ac.signal }); if (!r.ok) throw new Error(r.status);
+    const x = new DOMParser().parseFromString(await r.text(), "application/xml");
+    const g = n => [...x.getElementsByTagNameNS("*", n)].map(e => e.textContent.trim());
+    const title = (g("title")[0] || "").split(" / ")[0].replace(/\s*\[.*?\]\s*/g, " ").trim();
+    if (!title) return null;
+    const author = g("creator").map(c => c.replace(/\s*\(.*$/, "").replace(/\.\s*Auteur.*$/i, "")).map(c => { const [n, p] = c.split(", "); return p ? `${p} ${n}` : n; }).slice(0, 2).join(", ");
+    const pages = +((g("format").join(" ").match(/(\d+)\s*p\./) || [])[1]) || null;
+    return { title, author, pages, publisher: (g("publisher")[0] || "").replace(/\s*\(.*$/, ""), year: (g("date")[0] || "").slice(0, 4), desc: "", cover: "" };
+  } finally { clearTimeout(t); }
+}
+let lastDiag = "";
 async function lookupIsbn(isbn) {
   isbn = isbnClean(isbn);
-  const [ol, gb] = await Promise.allSettled([
+  const [ol, gb, bnf] = await Promise.allSettled([
     getJSON(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`),
-    getJSON(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`)
+    getJSON(gbUrl("isbn:" + isbn)),
+    fromBnF(isbn)
   ]);
   const o = ol.status === "fulfilled" ? ol.value[`ISBN:${isbn}`] : null;
   const g = gb.status === "fulfilled" && gb.value.items?.length ? fromGB(gb.value.items[0]) : null;
-  if (!o && !g) return null;
+  const f = bnf.status === "fulfilled" ? bnf.value : null;
+  const say = (name, st, hit) => `${name} : ${st.status === "rejected" ? why(st.reason) : hit ? "trouvé" : "pas ce livre"}`;
+  lastDiag = [say("Open Library", ol, o), say("Google Books", gb, g), say("BnF", bnf, f)].join(", ") + ".";
+  if (!o && !g && !f) return null;
   return {
-    isbn, title: g?.title || o?.title || "", author: g?.author || (o?.authors || []).map(a => a.name).join(", "),
-    pages: g?.pages || o?.number_of_pages || null, desc: g?.desc || "",
-    cover: https(o?.cover?.medium) || g?.cover || "", publisher: g?.publisher || (o?.publishers?.[0]?.name || ""), year: g?.year || (o?.publish_date || "").slice(-4)
+    isbn, title: g?.title || f?.title || o?.title || "", author: g?.author || f?.author || (o?.authors || []).map(a => a.name).join(", "),
+    pages: g?.pages || f?.pages || o?.number_of_pages || null, desc: g?.desc || "",
+    cover: https(o?.cover?.medium) || g?.cover || `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg?default=false`,
+    publisher: g?.publisher || f?.publisher || (o?.publishers?.[0]?.name || ""), year: g?.year || f?.year || (o?.publish_date || "").slice(-4)
   };
 }
 async function searchBooks(q) {
   const [gb, ol] = await Promise.allSettled([
-    getJSON(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&printType=books&maxResults=10&langRestrict=fr`),
+    getJSON(gbUrl(q) + "&printType=books&maxResults=10&langRestrict=fr"),
     getJSON(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=6&fields=title,author_name,isbn,number_of_pages_median,cover_i`)
   ]);
   const out = [];
@@ -375,7 +398,7 @@ async function findCover(b) {
   // 2. Google Books, tant qu'il ne bloque pas
   if (!gbBlocked) try {
     const q = `intitle:${b.title.replace(/[()]/g, " ")}${au ? " inauthor:" + au : ""}`;
-    const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&printType=books&maxResults=10`);
+    const r = await fetch(gbUrl(q) + "&printType=books&maxResults=10");
     if (r.status === 429 || r.status === 403) gbBlocked = true;
     else if (r.ok) { answered = true; const g = (await r.json()).items || []; const hit = g.map(fromGB).find(x => x.cover && fits(x.title)); if (hit) return hit.cover; }
   } catch {}
@@ -526,6 +549,7 @@ function sheetAdd(prefill = {}) {
 function sheetForm(p = {}) {
   const fake = { title: p.title || "Nouveau livre", author: p.author || "", track: "pilier", tier: "a", cover: p.cover };
   return closeBtn + `<div class="hero">${cloth(fake, "lg")}<h2 id="sheetTitle">Nouveau livre</h2><div class="meta">${p.isbn ? "ISBN " + esc(p.isbn) : "Vérifie et complète la fiche."}</div></div>
+  ${p.diag ? `<p class="hint" style="text-align:center">${esc(p.diag)}<br><a style="color:var(--foil)" href="https://www.google.com/search?q=${encodeURIComponent("ISBN " + p.isbn)}" target="_blank" rel="noopener">Chercher cet ISBN sur Google ↗</a></p>` : ""}
   <div class="fields" style="margin-top:14px">
     <label class="full"><span>Titre</span><input class="in" id="f-title" value="${esc(p.title || "")}"></label>
     <label><span>Auteur</span><input class="in" id="f-author" value="${esc(p.author || "")}"></label>
@@ -588,6 +612,9 @@ function sheetBackup() {
   <p class="hint" id="ghMsg">Le jeton reste sur ce téléphone. Il ne doit avoir accès qu'à ce dépôt.</p>`;
   return closeBtn + `<h3 id="sheetTitle">Sauvegarde</h3><p class="sub">${plural(S.data.books.length, "livre")} et ${plural(S.data.notes.length, "réflexion")} sur ce téléphone.</p>
   <div class="lbl">GitHub</div>${ghBlock}
+  <div class="lbl">Recherche de livres</div>
+  <div class="fields"><label class="full"><span>Clé Google Books (facultative)</span><input class="in" id="gb-key" value="${esc(gbKey())}" placeholder="AIza…" autocapitalize="off" autocorrect="off" spellcheck="false"></label></div>
+  <p class="hint">Sans clé, Google Books limite les recherches. Une clé gratuite lève cette limite.</p>
   <div class="lbl">Fichier</div>
   <div class="row"><span class="k">Dernier export</span><span class="v">${S.meta.lastExport ? fmtDate(S.meta.lastExport) : "Jamais"}</span></div>
   <div class="stack" style="margin-top:16px"><button class="btn" type="button" data-action="export">Exporter un fichier</button>
@@ -660,8 +687,8 @@ async function handleIsbn(isbn) {
   if (dup) { toast("Déjà dans ta bibliothèque"); openSheet("book", dup.id); return; }
   const hint = $("#scanHint"); if (hint) hint.innerHTML = `<span class="spin"></span>Recherche de ${isbn}…`;
   let r = null; try { r = navigator.onLine ? await lookupIsbn(isbn) : null; } catch {}
-  if (!r) toast("ISBN introuvable en ligne : complète à la main.");
-  offerEdition(r || { isbn });
+  if (!r) toast("Introuvable dans les bases : complète à la main.");
+  offerEdition(r || { isbn, diag: lastDiag });
 }
 const coreTitle = t => norm((t || "").replace(/\(.*?\)/g, " ").split(/[:.]/)[0]).replace(/\b(le|la|les|l|un|une)\b/g, " ").replace(/\s+/g, " ").trim();
 function findTwin(r) {
@@ -924,6 +951,7 @@ document.addEventListener("click", e => {
 });
 document.addEventListener("input", e => { if (e.target.id === "q") { S.q = e.target.value; render(); } });
 document.addEventListener("change", e => {
+  if (e.target.id === "gb-key") { try { localStorage.setItem("codex.gbkey", e.target.value.trim()); } catch {} toast(e.target.value.trim() ? "Clé Google Books enregistrée" : "Clé retirée"); return; }
   if (S.sheet?.kind !== "book") return;
   const id = S.sheet.arg, v = e.target.value.trim();
   const map = { "e-title": () => v && { title: v }, "e-author": () => ({ author: v }), "e-cycle": () => ({ cycle: parseInt(v) || null }),

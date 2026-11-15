@@ -1,5 +1,5 @@
 // Codex — service worker : l'appli fonctionne hors ligne, les recherches restent en ligne.
-const SHELL = "codex-shell-v8";
+const SHELL = "codex-shell-v9";
 const RUNTIME = "codex-runtime-v1";
 const FILES = ["./", "index.html", "manifest.webmanifest", "seed.json", "vendor/html5-qrcode.min.js",
   "fonts/newsreader-latin-opsz-normal.woff2", "fonts/newsreader-latin-opsz-italic.woff2", "fonts/hanken-grotesk-latin-wght-normal.woff2",
@@ -20,7 +20,7 @@ self.addEventListener("fetch", e => {
   const url = new URL(req.url);
 
   // Recherches de livres : toujours en direct.
-  if (/openlibrary\.org$|googleapis\.com$/.test(url.hostname) && !url.hostname.startsWith("covers.")) return;
+  if (/openlibrary\.org$|googleapis\.com$|bnf\.fr$/.test(url.hostname) && !url.hostname.startsWith("covers.")) return;
 
   // L'appli elle-même : le réseau d'abord pour recevoir les mises à jour, le cache si hors ligne.
   if (url.origin === location.origin) {

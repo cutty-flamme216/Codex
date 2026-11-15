@@ -1,5 +1,5 @@
 // Codex — service worker : l'appli fonctionne hors ligne, les recherches restent en ligne.
-const SHELL = "codex-shell-v1";
+const SHELL = "codex-shell-v2";
 const RUNTIME = "codex-runtime-v1";
 const FILES = ["./", "index.html", "manifest.webmanifest", "seed.json", "vendor/html5-qrcode.min.js",
   "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];

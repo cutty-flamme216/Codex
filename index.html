@@ -264,7 +264,7 @@ const TIERS = { god: "God", a: "Tiers A", b: "Tiers B" };
 const STATUS = { "a-lire": "À lire", "en-cours": "En cours", "lu": "Lu" };
 const OWN = { papier: "Papier", audible: "Audible", non: "À acheter" };
 const VIEWS = ["lecture", "bibliotheque", "carnet"];
-const VERSION = "1.4";
+const VERSION = "1.5";
 
 const S = { data: null, meta: { lastExport: 0, changedAt: 0 }, view: "lecture", q: "", track: "all", status: "all", sheet: null };
 
@@ -277,6 +277,7 @@ function persist(touch = true) {
   if (touch) S.meta.changedAt = Date.now();
   try { localStorage.setItem(KEY, JSON.stringify(S.data)); localStorage.setItem(META, JSON.stringify(S.meta)); }
   catch { toast("Espace de stockage plein : exporte une sauvegarde."); }
+  if (touch) schedulePush();
 }
 const books = () => [...S.data.books].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
 const bk = id => S.data.books.find(b => b.id === id);
@@ -405,7 +406,7 @@ function viewLecture() {
   const all = books(), lus = all.filter(b => b.status === "lu").length, cur = all.filter(b => b.status === "en-cours");
   const god = all.filter(b => b.tier === "god"), godLu = god.filter(b => b.status === "lu").length, buy = all.filter(b => b.own === "non").length;
   const cr = curRot();
-  const stale = S.meta.changedAt > S.meta.lastExport && Date.now() - (S.meta.lastExport || 0) > 14 * 864e5;
+  const stale = !GH.cfg()?.auto && S.meta.changedAt > S.meta.lastExport && Date.now() - (S.meta.lastExport || 0) > 14 * 864e5;
   let h = `<p class="summary"><b>${lus} livres lus</b> sur ${all.length}, dont <span class="g">${godLu} du palier God</span>. ${cur.length ? `${plural(cur.length, "lecture")} en cours` : "Aucune lecture en cours"}, ${buy} à acheter.</p>`;
   if (stale) h += `<div class="nudge"><span>${S.meta.lastExport ? "Dernière sauvegarde le " + fmtDate(S.meta.lastExport) + "." : "Aucune sauvegarde pour l'instant."}</span><button type="button" data-action="backup">Sauvegarder</button></div>`;
 
@@ -548,11 +549,26 @@ function sheetEdition(b) {
 }
 
 function sheetBackup() {
-  return closeBtn + `<h3 id="sheetTitle">Sauvegarde</h3><p class="sub">Tes données vivent sur ce téléphone. Exporte-les de temps en temps.</p>
-  <div class="lbl">Contenu</div>
-  <div class="row"><span class="k">Bibliothèque</span><span class="v">${plural(S.data.books.length, "livre")}, ${plural(S.data.notes.length, "réflexion")}</span></div>
+  const gh = GH.cfg();
+  const ghBlock = gh ? `
+  <div class="row"><span class="k">Dépôt</span><span class="v">${esc(gh.repo)}</span></div>
+  <div class="row"><span class="k">Dernier envoi</span><span class="v" id="ghState">${GH.state()}</span></div>
+  <div class="row"><span class="k">Envoi automatique</span><span class="v"><button class="act" type="button" data-action="ghAuto">${gh.auto ? "Activé" : "Désactivé"}</button></span></div>
+  <div class="stack" style="margin-top:16px"><button class="btn gold" type="button" data-action="ghPush">Envoyer sur GitHub maintenant</button>
+  <button class="btn" type="button" data-action="ghPull">Récupérer depuis GitHub</button>
+  <div id="ghConfirm"></div>
+  <button class="btn ghost" type="button" data-action="ghForget">Déconnecter GitHub de ce téléphone</button></div>`
+  : `<p class="hint" style="color:var(--paper-2)">Envoie tes données dans un dépôt GitHub privé : elles se sauvegardent toutes seules et tu les retrouves sur n'importe quel appareil.</p>
+  <div class="fields" style="margin-top:12px">
+    <label class="full"><span>Dépôt privé</span><input class="in" id="gh-repo" value="cutty-flamme216/codex-data" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+    <label class="full"><span>Jeton d'accès GitHub</span><input class="in" id="gh-token" type="password" placeholder="github_pat_…" autocapitalize="off" autocorrect="off" spellcheck="false"></label></div>
+  <div class="stack"><button class="btn gold" type="button" data-action="ghConnect">Connecter</button></div>
+  <p class="hint" id="ghMsg">Le jeton reste sur ce téléphone. Il ne doit avoir accès qu'à ce dépôt.</p>`;
+  return closeBtn + `<h3 id="sheetTitle">Sauvegarde</h3><p class="sub">${plural(S.data.books.length, "livre")} et ${plural(S.data.notes.length, "réflexion")} sur ce téléphone.</p>
+  <div class="lbl">GitHub</div>${ghBlock}
+  <div class="lbl">Fichier</div>
   <div class="row"><span class="k">Dernier export</span><span class="v">${S.meta.lastExport ? fmtDate(S.meta.lastExport) : "Jamais"}</span></div>
-  <div class="stack" style="margin-top:22px"><button class="btn gold" type="button" data-action="export">Exporter une sauvegarde</button>
+  <div class="stack" style="margin-top:16px"><button class="btn" type="button" data-action="export">Exporter un fichier</button>
   <button class="btn" type="button" data-action="import">Restaurer depuis un fichier</button></div>
   <p class="hint">Sur iPhone, choisis « Enregistrer dans Fichiers » ou envoie-la-toi par mail.</p>
   <div id="importConfirm"></div>
@@ -681,6 +697,86 @@ function startDict() {
 }
 function stopDict() { if (rec) { try { rec.stop(); } catch {} } }
 
+/* ================= Sauvegarde GitHub ================= */
+const GH = (() => {
+  const CFG = "codex.github.v1", FILE = "codex.json";
+  let timer = null, busy = false, again = false;
+  const cfg = () => { try { return JSON.parse(localStorage.getItem(CFG) || "null"); } catch { return null; } };
+  const save = c => { try { c ? localStorage.setItem(CFG, JSON.stringify(c)) : localStorage.removeItem(CFG); } catch {} };
+  const api = (c, method = "GET", body) => fetch(`https://api.github.com/repos/${c.repo}/contents/${FILE}`, {
+    method, keepalive: method === "PUT" && document.hidden,
+    headers: { Authorization: `Bearer ${c.token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", ...(body ? { "Content-Type": "application/json" } : {}) },
+    body: body ? JSON.stringify(body) : undefined, cache: "no-store" });
+  const enc = str => { const b = new TextEncoder().encode(str); let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(s); };
+  const dec = b64 => new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\s/g, "")), c => c.charCodeAt(0)));
+  const why = st => st === 401 ? "Jeton refusé : vérifie-le ou crée-en un nouveau." : st === 403 ? "Le jeton n'a pas le droit d'écrire : coche « Contents : Read and write »." : st === 404 ? "Dépôt introuvable : vérifie son nom et que le jeton y a accès." : `GitHub a répondu ${st}. Réessaie.`;
+  function state() {
+    const c = cfg(); if (!c) return "";
+    if (busy) return `<span class="spin"></span>Envoi…`;
+    if (c.error) return `<span style="color:#E3826F">${esc(c.error)}</span>`;
+    if (!c.lastPush) return "Jamais";
+    const pending = S.meta.changedAt > c.lastPush;
+    return (pending ? "En attente, " : "") + new Date(c.lastPush).toLocaleString("fr-BE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  }
+  const paint = () => { const el = $("#ghState"); if (el) el.innerHTML = state(); };
+  async function getSha(c) { const r = await api(c); if (r.status === 404) return null; if (!r.ok) throw r.status; return (await r.json()).sha; }
+  async function push(manual = false) {
+    const c = cfg(); if (!c) return;
+    if (busy) { again = true; return; }
+    if (!navigator.onLine) { if (manual) toast("Pas de connexion : l'envoi se fera plus tard."); return; }
+    busy = true; paint();
+    const payload = { app: "codex", v: 1, exportedAt: new Date().toISOString(), books: S.data.books, rotations: S.data.rotations, notes: S.data.notes };
+    const body = sha => ({ message: `Sauvegarde du ${new Date().toLocaleString("fr-BE")}`, content: enc(JSON.stringify(payload, null, 1)), ...(sha ? { sha } : {}) });
+    try {
+      let r = await api(c, "PUT", body(c.sha));
+      if (r.status === 409 || r.status === 422) { c.sha = await getSha(c); r = await api(c, "PUT", body(c.sha)); }
+      if (!r.ok) throw r.status;
+      const j = await r.json(); c.sha = j.content.sha; c.lastPush = Date.now(); c.error = ""; save(c);
+      if (manual) toast("Envoyé sur GitHub");
+    } catch (st) { c.error = typeof st === "number" ? why(st) : "Envoi impossible pour l'instant."; save(c); if (manual) toast(c.error); }
+    finally { busy = false; paint(); if (again) { again = false; schedulePush(2000); } }
+  }
+  async function connect() {
+    const repo = $("#gh-repo").value.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "").replace(/\/$/, "");
+    const token = $("#gh-token").value.trim(), msg = $("#ghMsg");
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) { msg.textContent = "Écris le dépôt sous la forme utilisateur/nom."; return; }
+    if (!token) { msg.textContent = "Colle ton jeton d'accès."; $("#gh-token").focus(); return; }
+    msg.innerHTML = `<span class="spin"></span>Vérification…`;
+    try {
+      const rr = await fetch(`https://api.github.com/repos/${repo}`, { headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" } });
+      if (!rr.ok) { msg.textContent = why(rr.status); return; }
+      const info = await rr.json();
+      if (!info.private) { msg.textContent = "Ce dépôt est public : tes réflexions seraient visibles par tous. Passe-le en privé d'abord."; return; }
+      const c = { repo, token, auto: true, sha: null, lastPush: 0, error: "" };
+      c.sha = await getSha(c);
+      save(c);
+      if (c.sha) { openSheet("backup"); toast("Connecté. Une sauvegarde existe déjà sur GitHub."); askPull(); }
+      else { openSheet("backup"); await push(true); }
+    } catch (e) { msg.textContent = typeof e === "number" ? why(e) : "GitHub ne répond pas. Vérifie ta connexion."; }
+  }
+  let remote = null;
+  async function askPull() {
+    const c = cfg(), box = $("#ghConfirm"); if (!c || !box) return;
+    box.innerHTML = `<p class="hint"><span class="spin"></span>Lecture de la sauvegarde…</p>`;
+    try {
+      const r = await api(c); if (!r.ok) throw r.status;
+      const j = await r.json(); remote = JSON.parse(dec(j.content)); c.sha = j.sha; save(c);
+      box.innerHTML = `<p class="hint" style="color:var(--paper-2)">Remplacer ce qu'il y a sur ce téléphone (${plural(S.data.books.length, "livre")}, ${plural(S.data.notes.length, "réflexion")}) par la sauvegarde GitHub du ${fmtDate(Date.parse(remote.exportedAt))} (${plural(remote.books.length, "livre")}, ${plural(remote.notes.length, "réflexion")}) ?</p>
+        <div class="stack"><button class="btn gold" type="button" data-action="ghPullYes">Remplacer</button><button class="btn" type="button" data-action="ghPullNo">Garder ce téléphone</button></div>`;
+    } catch (st) { box.innerHTML = `<p class="hint">${typeof st === "number" ? why(st) : "Lecture impossible pour l'instant."}</p>`; }
+  }
+  function pull() {
+    if (!remote || remote.app !== "codex") return;
+    S.data = { v: 1, books: remote.books, rotations: remote.rotations, notes: remote.notes }; remote = null;
+    persist(false); const c = cfg(); c.lastPush = Date.now(); save(c); closeSheet(); render(); toast("Données récupérées depuis GitHub");
+  }
+  function schedule(ms = 15000) { const c = cfg(); if (!c?.auto) return; clearTimeout(timer); timer = setTimeout(() => push(false), ms); }
+  document.addEventListener("visibilitychange", () => { const c = cfg(); if (document.hidden && c?.auto && S.meta.changedAt > (c.lastPush || 0)) { clearTimeout(timer); push(false); } });
+  addEventListener("online", () => { const c = cfg(); if (c?.auto && S.meta.changedAt > (c.lastPush || 0)) schedule(2000); });
+  return { cfg, save, push, connect, askPull, pull, state, schedule };
+})();
+function schedulePush(ms) { GH.schedule(ms); }
+
 /* ================= Sauvegarde ================= */
 async function exportData() {
   const payload = { app: "codex", v: 1, exportedAt: new Date().toISOString(), books: S.data.books, rotations: S.data.rotations, notes: S.data.notes };
@@ -755,6 +851,13 @@ document.addEventListener("click", e => {
     case "findCovers": runCovers(); break;
     case "stopCovers": if (coverJob) coverJob.stop = true; break;
     case "removeCover": patchBook(S.sheet.arg, { cover: "", noCover: true }); toast("Couverture retirée"); break;
+    case "ghConnect": GH.connect(); break;
+    case "ghPush": GH.push(true); break;
+    case "ghPull": GH.askPull(); break;
+    case "ghPullYes": GH.pull(); break;
+    case "ghPullNo": $("#ghConfirm").innerHTML = ""; break;
+    case "ghAuto": { const c = GH.cfg(); c.auto = !c.auto; GH.save(c); openSheet("backup"); break; }
+    case "ghForget": if (!t.classList.contains("confirm")) { t.classList.add("confirm"); t.textContent = "Touche encore pour déconnecter"; break; } GH.save(null); openSheet("backup"); toast("GitHub déconnecté"); break;
     case "export": exportData(); break;
     case "import": $("#importFile").click(); break;
     case "importYes": if (pendingImport) { S.data = { v: 1, books: pendingImport.books, rotations: pendingImport.rotations, notes: pendingImport.notes }; pendingImport = null; persist(); closeSheet(); render(); toast("Sauvegarde restaurée"); } break;

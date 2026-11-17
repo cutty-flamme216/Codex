@@ -11,6 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="Codex">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.webmanifest">
+<script src="quotes.js"></script>
 <link rel="icon" href="icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preload" href="fonts/newsreader-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin>
@@ -151,6 +152,19 @@ img{max-width:100%}
 .quote .src button{color:var(--paper-2);font-weight:600;font-size:14px}
 .empty{font-family:var(--serif);font-style:italic;font-size:19px;color:var(--dim);padding:22px 0;line-height:1.45}
 
+/* Citations */
+.cite{margin:0 0 12px;padding:2px 0 2px 16px;border-left:2px solid var(--foil-dim)}
+.cite blockquote{margin:0;font-family:var(--serif);font-size:18px;line-height:1.5;color:var(--paper);text-wrap:pretty;max-width:34em}
+.cite figcaption{display:flex;justify-content:space-between;gap:12px;align-items:baseline;margin-top:6px;font-size:12.5px;color:var(--dim)}
+.qbook{padding:18px 0 8px;border-bottom:1px solid var(--edge)}
+.qhead{display:flex;gap:12px;align-items:center;margin-bottom:14px;width:100%}
+.qhead .t{display:block;font-family:var(--serif);font-size:18px;font-weight:500}
+.qhead .s{display:block;font-size:13px;color:var(--dim)}
+.addq{margin-top:6px}
+.addq summary{cursor:pointer;color:var(--foil);font-weight:600;font-size:14px;padding:6px 0;list-style:none}
+.addq summary::-webkit-details-marker{display:none}
+.addq summary::before{content:"+ "}
+
 /* Barre d'onglets */
 .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(20,15,12,.86);-webkit-backdrop-filter:blur(16px) saturate(1.2);backdrop-filter:blur(16px) saturate(1.2);border-top:1px solid var(--edge);
   padding:8px max(16px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
@@ -266,9 +280,9 @@ const TIERS = { god: "God", a: "Tiers A", b: "Tiers B" };
 const STATUS = { "a-lire": "À lire", "en-cours": "En cours", "lu": "Lu" };
 const OWN = { papier: "Papier", audible: "Audible", non: "À acheter" };
 const VIEWS = ["lecture", "bibliotheque", "carnet"];
-const VERSION = "1.9";
+const VERSION = "2.0";
 
-const S = { data: null, meta: { lastExport: 0, changedAt: 0 }, view: "lecture", q: "", track: "all", status: "all", sheet: null };
+const S = { data: null, meta: { lastExport: 0, changedAt: 0 }, view: "lecture", q: "", track: "all", status: "all", carnet: "notes", sheet: null };
 
 function load() {
   try { const m = JSON.parse(localStorage.getItem(META) || "null"); if (m) S.meta = { ...S.meta, ...m }; } catch {}
@@ -424,6 +438,13 @@ async function runCovers() {
   else toast("Aucune couverture trouvée pour ces livres.");
 }
 
+const atHomeUnread = b => b.status !== "lu" && (b.own === "papier" || b.own === "audible");
+function ensureQuotes(b) {
+  if (!b || b.quotes || b.status !== "lu") return;
+  const src = (window.CODEX_QUOTES || {})[b.id]; if (!src) return;
+  b.quotes = src.map(([text, s], i) => ({ id: "s" + i, text, src: s })); persist(false);
+}
+
 /* ================= Vues ================= */
 function nextFor(t) { for (const r of S.data.rotations) { const b = bk(r[t]); if (b && b.status === "a-lire") return { b, r }; } return null; }
 function curRot() { const r = S.data.rotations.find(r => ["pilier","sage","plaisir"].some(t => bk(r[t])?.status !== "lu")); return r ? r.n : null; }
@@ -467,7 +488,7 @@ function viewLecture() {
 function viewBiblio() {
   const all = books(), q = S.q.trim().toLowerCase();
   const list = all.filter(b => (S.track === "all" || (b.tracks || [b.track]).includes(S.track))
-    && (S.status === "all" || (S.status === "non" ? b.own === "non" : b.status === S.status))
+    && (S.status === "all" || (S.status === "non" ? b.own === "non" : S.status === "chez" ? atHomeUnread(b) : b.status === S.status))
     && (!q || `${b.title} ${b.author} ${b.isbn || ""}`.toLowerCase().includes(q)));
   const cnt = f => all.filter(f).length;
   const tab = (k, v, l, n) => `<button type="button" data-${k}="${v}" aria-pressed="${S[k] === v}">${l}${n != null ? `<span class="n">${n}</span>` : ""}</button>`;
@@ -475,7 +496,7 @@ function viewBiblio() {
       <input id="q" type="search" placeholder="Chercher un titre, un auteur" value="${esc(S.q)}" aria-label="Rechercher" autocomplete="off">
       <button class="addbtn" type="button" data-action="add">Ajouter</button></div>
     <div class="tabs">${tab("track","all","Tout")}${tab("track","pilier","Pilier",cnt(b=>b.track==="pilier"))}${tab("track","sage","Sage",cnt(b=>b.track==="sage"))}${tab("track","plaisir","Plaisir",cnt(b=>b.track==="plaisir"))}</div>
-    <div class="tabs sub">${tab("status","all","Tous")}${tab("status","en-cours","En cours",cnt(b=>b.status==="en-cours"))}${tab("status","a-lire","À lire",cnt(b=>b.status==="a-lire"))}${tab("status","lu","Lus",cnt(b=>b.status==="lu"))}${tab("status","non","À acheter",cnt(b=>b.own==="non"))}</div>
+    <div class="tabs sub">${tab("status","all","Tous")}${tab("status","en-cours","En cours",cnt(b=>b.status==="en-cours"))}${tab("status","a-lire","À lire",cnt(b=>b.status==="a-lire"))}${tab("status","chez","Chez moi, pas lus",cnt(atHomeUnread))}${tab("status","lu","Lus",cnt(b=>b.status==="lu"))}${tab("status","non","À acheter",cnt(b=>b.own==="non"))}</div>
     <p class="count">${plural(list.length, "livre")}</p>`;
   const missing = all.filter(b => !b.cover && !b.noCover).length;
   if (coverJob) h += `<div class="nudge"><span><span class="spin"></span>Couvertures : ${coverJob.done} sur ${coverJob.total}, ${coverJob.found} trouvées</span><button type="button" data-action="stopCovers">Arrêter</button></div>`;
@@ -489,7 +510,16 @@ function viewBiblio() {
 
 function viewCarnet() {
   const notes = [...S.data.notes].sort((a, b) => b.at - a.at);
-  let h = `<h2 class="h">Carnet <small>${plural(notes.length, "réflexion")}</small></h2>`;
+  S.data.books.forEach(ensureQuotes);
+  const withQ = books().filter(b => b.quotes?.length);
+  const nq = withQ.reduce((n, b) => n + b.quotes.length, 0);
+  let h = `<h2 class="h">Carnet</h2><div class="tabs" style="margin-top:0"><button type="button" data-carnet="notes" aria-pressed="${S.carnet === "notes"}">Mes réflexions<span class="n">${notes.length}</span></button>
+    <button type="button" data-carnet="quotes" aria-pressed="${S.carnet === "quotes"}">Citations<span class="n">${nq}</span></button></div><div style="height:14px"></div>`;
+  if (S.carnet === "quotes") {
+    if (!withQ.length) return h + `<p class="empty">Les citations apparaissent ici quand tu marques un livre comme lu.</p>`;
+    return h + withQ.map(b => `<div class="qbook"><button class="qhead" type="button" data-open="${b.id}">${cloth(b, "sm")}<span><span class="t">${esc(b.title)}</span><span class="s">${esc(shortAuthor(b.author))}</span></span></button>
+      ${b.quotes.map(q => `<figure class="cite"><blockquote>${esc(q.text)}</blockquote>${q.src ? `<figcaption>${esc(q.src)}</figcaption>` : ""}</figure>`).join("")}</div>`).join("");
+  }
   if (!notes.length) return h + `<p class="empty">Ton carnet est vide. Ouvre un livre et note ce qu'il t'a fait penser.</p>`;
   return h + notes.map(n => { const b = bk(n.bookId); return `<article class="quote"><blockquote>${esc(n.text)}</blockquote>
     <div class="src"><button type="button" data-open="${esc(n.bookId)}">${esc(b?.title || "Livre retiré")}</button><span>${fmtDate(n.at)}</span></div></article>`; }).join("");
@@ -515,6 +545,13 @@ function sheetBook(b) {
     <div class="bar">${Speech ? `<button class="mic" type="button" id="micBtn">${micIcon}<span>Dicter</span></button>` : "<span></span>"}<button class="ink-btn" type="button" data-action="saveNote">Enregistrer</button></div></div>
   <div class="snotes">${notes.map(n => `<article class="quote"><blockquote>${esc(n.text)}</blockquote>
     <div class="src"><span>${fmtDate(n.at)}</span><button class="del" type="button" data-del="${n.id}">Supprimer</button></div></article>`).join("")}</div>
+  ${(ensureQuotes(b), b.status === "lu" || b.quotes?.length) ? `<div class="lbl">Citations</div>
+  ${(b.quotes || []).map(q => `<figure class="cite"><blockquote>${esc(q.text)}</blockquote><figcaption><span>${esc(q.src || "")}</span><button class="del" type="button" data-delq="${q.id}">Retirer</button></figcaption></figure>`).join("")
+    || `<p class="hint">Pas de citation proposée pour ce livre, encore protégé par le droit d'auteur. Ajoute celles qui t'ont marqué.</p>`}
+  <details class="addq"><summary>Ajouter une citation</summary>
+    <div class="fields" style="margin-top:10px"><label class="full"><span>Citation</span><textarea class="in" id="q-txt" rows="3"></textarea></label>
+    <label class="full"><span>Source (chapitre, page, personnage)</span><input class="in" id="q-src"></label></div>
+    <div class="stack"><button class="btn" type="button" data-action="addQuote">Ajouter</button></div></details>` : ""}
   <div class="lbl">Détails</div>
   <div class="row"><span class="k">Audible</span><span class="v">${b.audibleUrl ? `<a href="${esc(b.audibleUrl)}" target="_blank" rel="noopener">${esc(b.audible || "Ouvrir")} ↗</a>` : esc(b.audible || "Pas vérifié")}</span></div>
   <div class="row"><span class="k">Édition</span><span class="v">${b.isbn ? `${esc(b.isbn)}${b.pages ? `, ${b.pages} pages` : ""}` : "Aucune"} <button class="act" type="button" data-action="findEdition" style="margin-left:8px">${b.isbn ? "Changer" : "Trouver"}</button></span></div>
@@ -896,6 +933,11 @@ document.addEventListener("click", e => {
   if (t.hasAttribute("data-pickadd")) { const r = lastResults[+t.dataset.pickadd]; const dup = r.isbn && S.data.books.find(b => isbnClean(b.isbn) === isbnClean(r.isbn)); if (dup) { toast("Déjà dans ta bibliothèque, même édition"); openSheet("book", dup.id); } else offerEdition(r); return; }
   if (t.hasAttribute("data-pickedition")) { const r = lastResults[+t.dataset.pickedition], id = S.sheet.arg; const b = bk(id);
     patchBook(id, { isbn: r.isbn || b.isbn, pages: r.pages || b.pages, cover: r.cover || b.cover, noCover: false, author: b.author || r.author, desc: b.desc || r.desc }); toast("Édition liée"); openSheet("book", id); return; }
+  if (t.dataset.carnet) { S.carnet = t.dataset.carnet; render(); return; }
+  if (t.dataset.delq) {
+    if (!t.classList.contains("confirm")) { t.classList.add("confirm"); t.textContent = "Confirmer"; setTimeout(() => { if (t.isConnected) { t.classList.remove("confirm"); t.textContent = "Retirer"; } }, 4000); return; }
+    const b = bk(S.sheet.arg); patchBook(b.id, { quotes: b.quotes.filter(q => q.id !== t.dataset.delq) }); toast("Citation retirée"); return;
+  }
   if (t.dataset.del) {
     if (!t.classList.contains("confirm")) { t.classList.add("confirm"); t.textContent = "Confirmer"; setTimeout(() => { if (t.isConnected) { t.classList.remove("confirm"); t.textContent = "Supprimer"; } }, 4000); return; }
     S.data.notes = S.data.notes.filter(n => n.id !== t.dataset.del); persist(); render(); toast("Réflexion supprimée"); return;
@@ -929,6 +971,8 @@ document.addEventListener("click", e => {
       const id = S.sheet.arg; S.data.books = S.data.books.filter(b => b.id !== id); S.data.notes = S.data.notes.filter(n => n.bookId !== id);
       persist(); closeSheet(); render(); toast("Livre retiré"); break;
     }
+    case "addQuote": { const tx = $("#q-txt").value.trim(); if (!tx) { $("#q-txt").focus(); toast("Écris d'abord la citation."); break; }
+      const b = bk(S.sheet.arg); patchBook(b.id, { quotes: [...(b.quotes || []), { id: "q" + Date.now().toString(36), text: tx, src: $("#q-src").value.trim() }] }); toast("Citation ajoutée"); break; }
     case "edReplace": { const { r, id } = pendingEdition; const b = bk(id); pendingEdition = null;
       patchBook(id, { isbn: r.isbn || b.isbn, pages: r.pages || b.pages, cover: r.cover || b.cover, noCover: false, author: b.author || r.author, desc: b.desc || r.desc });
       toast("Édition remplacée"); openSheet("book", id); break; }

@@ -268,7 +268,7 @@ textarea.in{resize:vertical;line-height:1.5}
 </nav></div>
 
 <div id="sheetRoot"></div>
-<input type="file" id="importFile" accept="application/json,.json" hidden>
+<input type="file" id="importFile" hidden>
 <input type="file" id="photoFile" accept="image/*" capture="environment" hidden>
 
 <script>
@@ -280,7 +280,7 @@ const TIERS = { god: "God", a: "Tiers A", b: "Tiers B" };
 const STATUS = { "a-lire": "À lire", "en-cours": "En cours", "lu": "Lu" };
 const OWN = { papier: "Papier", audible: "Audible", non: "À acheter" };
 const VIEWS = ["lecture", "bibliotheque", "carnet"];
-const VERSION = "2.1";
+const VERSION = "2.2";
 
 const S = { data: null, meta: { lastExport: 0, changedAt: 0 }, view: "lecture", q: "", track: "all", status: "all", carnet: "notes", sheet: null };
 
@@ -909,6 +909,20 @@ async function exportData() {
   } catch (e) { if (e?.name !== "AbortError") toast("Export impossible. Réessaie."); }
 }
 let pendingImport = null, pendingAdd = null;
+// Ajouts déposés par Claude dans le dépôt : appliqués une seule fois, automatiquement, au démarrage.
+const PENDING_ADDS = [];
+async function applyPendingAdds() {
+  const done = S.meta.appliedAdds || [];
+  for (const f of PENDING_ADDS) {
+    if (done.includes(f)) continue;
+    try {
+      const d = await (await fetch(f, { cache: "no-store" })).json();
+      if (d.app !== "codex-ajouts") continue;
+      const n = applyAdditions(d); S.meta.appliedAdds = [...done, f]; persist();
+      setTimeout(() => toast(`${plural(n, "réflexion ou citation")} ajoutée${n > 1 ? "s" : ""} par Claude`), 600);
+    } catch {}
+  }
+}
 function applyAdditions(d) {
   let n = 0;
   for (const x of d.books) {
@@ -1054,6 +1068,7 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) { sto
     catch { S.data = { v: 1, books: [], rotations: [], notes: [] }; }
     try { await navigator.storage?.persist?.(); } catch {}
   }
+  await applyPendingAdds();
   if (S.meta.coverFix !== 1) { S.data.books.forEach(b => { delete b.noCover; }); S.meta.coverFix = 1; persist(false); }
   render();
   if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});

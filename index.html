@@ -280,7 +280,7 @@ const TIERS = { god: "God", a: "Tiers A", b: "Tiers B" };
 const STATUS = { "a-lire": "À lire", "en-cours": "En cours", "lu": "Lu" };
 const OWN = { papier: "Papier", audible: "Audible", non: "À acheter" };
 const VIEWS = ["lecture", "bibliotheque", "carnet"];
-const VERSION = "2.0";
+const VERSION = "2.1";
 
 const S = { data: null, meta: { lastExport: 0, changedAt: 0 }, view: "lecture", q: "", track: "all", status: "all", carnet: "notes", sheet: null };
 
@@ -656,7 +656,8 @@ function sheetBackup() {
   <div class="lbl">Fichier</div>
   <div class="row"><span class="k">Dernier export</span><span class="v">${S.meta.lastExport ? fmtDate(S.meta.lastExport) : "Jamais"}</span></div>
   <div class="stack" style="margin-top:16px"><button class="btn" type="button" data-action="export">Exporter un fichier</button>
-  <button class="btn" type="button" data-action="import">Restaurer depuis un fichier</button></div>
+  <button class="btn" type="button" data-action="import">Importer un fichier</button></div>
+  <p class="hint">Une sauvegarde remplace tes données ; un fichier d'ajouts se fusionne avec elles.</p>
   <p class="hint">Sur iPhone, choisis « Enregistrer dans Fichiers » ou envoie-la-toi par mail.</p>
   <div id="importConfirm"></div>
   <p class="foot">Codex, version ${VERSION}. Recherche via Open Library et Google Books.</p>`;
@@ -907,16 +908,42 @@ async function exportData() {
     S.meta.lastExport = Date.now(); persist(false); toast("Sauvegarde exportée"); if (S.sheet?.kind === "backup") openSheet("backup"); render();
   } catch (e) { if (e?.name !== "AbortError") toast("Export impossible. Réessaie."); }
 }
-let pendingImport = null;
+let pendingImport = null, pendingAdd = null;
+function applyAdditions(d) {
+  let n = 0;
+  for (const x of d.books) {
+    const b = bk(x.id); if (!b) continue;
+    if (x.replaceNotes?.length) S.data.notes = S.data.notes.filter(m => !(m.bookId === b.id && x.replaceNotes.includes(m.id)));
+    for (const [i, text] of (x.notes || []).entries()) {
+      if (S.data.notes.some(m => m.bookId === b.id && m.text === text)) continue;
+      S.data.notes.push({ id: "n" + Date.now().toString(36) + i + n, bookId: b.id, text, at: Date.now() + i }); n++;
+    }
+    ensureQuotes(b); if (!b.quotes) b.quotes = [];
+    for (const [i, [text, src]] of (x.quotes || []).entries()) {
+      if (b.quotes.some(q => q.text === text)) continue;
+      b.quotes.push({ id: "q" + Date.now().toString(36) + i + n, text, src }); n++;
+    }
+    b.updatedAt = Date.now();
+  }
+  return n;
+}
 $("#importFile").addEventListener("change", async e => {
   const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
   try {
     const d = JSON.parse(await f.text());
+    if (d.app === "codex-ajouts" && Array.isArray(d.books)) {
+      pendingAdd = d;
+      const known = d.books.filter(x => bk(x.id));
+      const nn = known.reduce((n, x) => n + (x.notes || []).length, 0), nq = known.reduce((n, x) => n + (x.quotes || []).length, 0);
+      const box = $("#importConfirm"); if (box) box.innerHTML = `<p class="hint" style="margin-top:18px;color:var(--paper-2)">Ajouter ${plural(nn, "réflexion")} et ${plural(nq, "citation")} pour ${plural(known.length, "livre")} : ${known.map(x => esc(bk(x.id).title)).join(", ")} ? Le reste de tes données ne change pas.</p>
+        <div class="stack"><button class="btn gold" type="button" data-action="addYes">Ajouter</button><button class="btn" type="button" data-action="importNo">Annuler</button></div>`;
+      return;
+    }
     if (d.app !== "codex" || !Array.isArray(d.books) || !Array.isArray(d.rotations) || !Array.isArray(d.notes)) throw 0;
     pendingImport = d;
     const box = $("#importConfirm"); if (box) box.innerHTML = `<p class="hint" style="margin-top:18px;color:var(--paper-2)">Remplacer tes données actuelles (${plural(S.data.books.length, "livre")}) par la sauvegarde du ${fmtDate(Date.parse(d.exportedAt))} (${plural(d.books.length, "livre")}, ${plural(d.notes.length, "réflexion")}) ?</p>
       <div class="stack"><button class="btn gold" type="button" data-action="importYes">Remplacer</button><button class="btn" type="button" data-action="importNo">Annuler</button></div>`;
-  } catch { toast("Ce fichier n'est pas une sauvegarde Codex."); }
+  } catch { toast("Ce fichier n'est ni une sauvegarde ni des ajouts Codex."); }
 });
 
 /* ================= Événements ================= */
@@ -993,7 +1020,8 @@ document.addEventListener("click", e => {
     case "export": exportData(); break;
     case "import": $("#importFile").click(); break;
     case "importYes": if (pendingImport) { S.data = { v: 1, books: pendingImport.books, rotations: pendingImport.rotations, notes: pendingImport.notes }; pendingImport = null; persist(); closeSheet(); render(); toast("Sauvegarde restaurée"); } break;
-    case "importNo": pendingImport = null; $("#importConfirm").innerHTML = ""; break;
+    case "addYes": if (pendingAdd) { const n = applyAdditions(pendingAdd); pendingAdd = null; persist(); closeSheet(); render(); toast(`${plural(n, "élément")} ajouté${n > 1 ? "s" : ""}`); } break;
+    case "importNo": pendingImport = null; pendingAdd = null; $("#importConfirm").innerHTML = ""; break;
   }
 });
 document.addEventListener("input", e => { if (e.target.id === "q") { S.q = e.target.value; render(); } });
